@@ -685,13 +685,60 @@ function setStatus(idx, status){
 function handlePhoto(idx, input){
   const file = input.files[0];
   if(!file) return;
-  formItems[idx].photoFile = file;
+  formItems[idx].photoFile = file; // provisional; replaced below once compression finishes
   const reader = new FileReader();
   reader.onload = e=>{
     formItems[idx].photoDataUrl = e.target.result;
     document.getElementById('preview-'+idx).innerHTML = `<img src="${e.target.result}">`;
   };
   reader.readAsDataURL(file);
+  // Tablet camera photos can be 5-15MB+, which is a common cause of "Load failed" uploads
+  // on shaky on-site wifi/cellular. Downscale + re-compress to JPEG before it's ever sent.
+  resizeImageFile(file, 1600, 0.82).then(compressed=>{ formItems[idx].photoFile = compressed; });
+}
+function resizeImageFile(file, maxDim, quality){
+  return new Promise((resolve)=>{
+    try{
+      const img = new Image();
+      const url = URL.createObjectURL(file);
+      img.onload = ()=>{
+        let {width, height} = img;
+        if(width > maxDim || height > maxDim){
+          const scale = maxDim / Math.max(width, height);
+          width = Math.round(width*scale);
+          height = Math.round(height*scale);
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width; canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+        URL.revokeObjectURL(url);
+        canvas.toBlob(blob=>{
+          if(!blob){ resolve(file); return; }
+          const baseName = (file.name||'photo').replace(/\.\w+$/, '');
+          resolve(new File([blob], baseName+'.jpg', {type:'image/jpeg'}));
+        }, 'image/jpeg', quality);
+      };
+      img.onerror = ()=>{ URL.revokeObjectURL(url); resolve(file); };
+      img.src = url;
+    }catch(e){ resolve(file); }
+  });
+}
+async function uploadPhotoWithRetry(itemId, columnId, file, attempts){
+  attempts = attempts || 2;
+  const upQ = `mutation($item_id:ID!, $column_id:String!, $file:File!){ add_file_to_column(item_id:$item_id, column_id:$column_id, file:$file){ id } }`;
+  let lastErr;
+  for(let a=1; a<=attempts; a++){
+    try{
+      await mondayFileUpload(upQ, itemId, columnId, file);
+      return true;
+    }catch(e){
+      lastErr = e;
+      if(a<attempts) await new Promise(r=>setTimeout(r, 1200));
+    }
+  }
+  console.warn('Photo upload failed after retries for item '+itemId, lastErr);
+  return false;
 }
 function showCustomInput(secId){
   document.getElementById('custom-input-'+secId).classList.add('show');
@@ -774,6 +821,7 @@ async function submitInspection(){
   prog.style.display='block';
   const today = new Date().toISOString().slice(0,10);
 
+  let photoFailures = [];
   try{
     if(currentRound===1){
       progText.textContent = 'Creating inspection record...';
@@ -793,7 +841,7 @@ async function submitInspection(){
       currentInspectionItemId = newItemId;
 
       progText.textContent = 'Adding checklist items (0/'+formItems.length+')...';
-      await createAllSubitems(newItemId, progText);
+      photoFailures = await createAllSubitems(newItemId, progText);
 
     } else {
       progText.textContent = 'Updating checklist items...';
@@ -809,13 +857,15 @@ async function submitInspection(){
         }`;
         await mondayApi(updQ, {boardId: BOARD_SUBITEMS, itemId: it.subitemId, cv: JSON.stringify(cv)});
         if(it.photoFile){
-          const upQ = `mutation($item_id:ID!, $column_id:String!, $file:File!){ add_file_to_column(item_id:$item_id, column_id:$column_id, file:$file){ id } }`;
-          await mondayFileUpload(upQ, it.subitemId, SUBCOL.photo, it.photoFile);
+          progText.textContent = `Uploading photo ${i+1}/${existingOnes.length}...`;
+          const ok = await uploadPhotoWithRetry(it.subitemId, SUBCOL.photo, it.photoFile);
+          if(!ok) photoFailures.push(it.text);
         }
       }
       if(newOnes.length){
         progText.textContent = 'Adding new items found during re-inspection...';
-        await createAllSubitems(currentInspectionItemId, progText, newOnes);
+        const moreFailures = await createAllSubitems(currentInspectionItemId, progText, newOnes);
+        photoFailures = photoFailures.concat(moreFailures);
       }
 
       const notApproved = formItems.filter(i=>i.status==='Not Approved').length;
@@ -840,9 +890,13 @@ async function submitInspection(){
     }
 
     document.getElementById('success-title').textContent = currentRound===1 ? 'Round 1 Submitted' : (showSignoff ? 'Fully Approved & Signed' : 'Round 2 Progress Saved');
-    document.getElementById('success-sub').textContent = currentRound===1
+    let successMsg = currentRound===1
       ? 'The contractor will be notified with the list of damages in the next batch.'
       : (showSignoff ? 'Final signed report will be sent to the contractor in the next batch.' : 'Remaining Not Approved items were updated.');
+    if(photoFailures.length){
+      successMsg += ` Note: ${photoFailures.length} photo(s) couldn't upload (weak connection) for: ${photoFailures.join(', ')}. The checklist item itself was saved — reopen this apartment later to add those photos.`;
+    }
+    document.getElementById('success-sub').textContent = successMsg;
     showScreen('screen-success');
 
   }catch(e){
@@ -854,6 +908,7 @@ async function submitInspection(){
 
 async function createAllSubitems(parentId, progText, itemsOverride){
   const items = itemsOverride || formItems;
+  const photoFailures = [];
   for(let i=0;i<items.length;i++){
     const it = items[i];
     if(progText) progText.textContent = `Adding checklist items (${i+1}/${items.length})...`;
@@ -870,10 +925,12 @@ async function createAllSubitems(parentId, progText, itemsOverride){
     const subId = res.create_subitem.id;
     it.subitemId = subId;
     if(it.photoFile){
-      const upQ = `mutation($item_id:ID!, $column_id:String!, $file:File!){ add_file_to_column(item_id:$item_id, column_id:$column_id, file:$file){ id } }`;
-      await mondayFileUpload(upQ, subId, SUBCOL.photo, it.photoFile);
+      if(progText) progText.textContent = `Uploading photo (${i+1}/${items.length})...`;
+      const ok = await uploadPhotoWithRetry(subId, SUBCOL.photo, it.photoFile);
+      if(!ok) photoFailures.push(it.text);
     }
   }
+  return photoFailures;
 }
 
 function resetToHome(){
