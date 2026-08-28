@@ -533,7 +533,7 @@ async function fetchProjectInspectionStatuses(projectId){
   do{
     const q = `query($cursor:String){
       boards(ids:[${BOARD_INSPECTIONS}]){
-        items_page(limit:100, cursor:$cursor, query_params:{rules:[{column_id:"${COL.project}", compare_value:["${projectId}"], operator:any_of}]}){
+        items_page(limit:100, cursor:$cursor, query_params:{rules:[{column_id:"${COL.project}", compare_value:[${Number(projectId)}], operator:any_of}]}){
           cursor
           items{
             id
@@ -665,7 +665,7 @@ async function selectApartment(aptId){
   try{
     const q = `query{
       boards(ids:[${BOARD_INSPECTIONS}]){
-        items_page(limit:5, query_params:{rules:[{column_id:"${COL.apartment}", compare_value:["${aptId}"], operator:any_of}]}){
+        items_page(limit:5, query_params:{rules:[{column_id:"${COL.apartment}", compare_value:[${Number(aptId)}], operator:any_of}]}){
           items{
             id
             name
