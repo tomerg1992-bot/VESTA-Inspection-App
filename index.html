@@ -110,11 +110,9 @@
   .filter-chip{background:#eef1f8;color:var(--navy);border:1.5px solid transparent;font-size:12px;font-weight:800;padding:6px 12px;border-radius:20px;}
   .filter-chip.sel{background:var(--navy);color:#fff;}
   .status-pill{display:inline-block;padding:3px 9px;border-radius:20px;font-size:10.5px;font-weight:800;vertical-align:middle;margin-left:6px;white-space:nowrap;}
-  .st-notstarted{background:#eef1f8;color:var(--gray);}
-  .st-needsr2{background:#fff1de;color:var(--orange);}
-  .st-r2progress{background:#dceafd;color:var(--blue);}
+  .st-new{background:#eef1f8;color:var(--gray);}
+  .st-not-completed{background:#fff1de;color:var(--orange);}
   .st-approved{background:#d7f7e9;color:var(--green);}
-  .st-syncing{background:#eef1f8;color:var(--navy);}
   .sync-banner{position:sticky;top:0;z-index:30;background:var(--navy);color:#fff;cursor:pointer;}
   .sync-banner-row{display:flex;align-items:center;gap:10px;padding:10px 16px;}
   .sync-banner-text{flex:1;font-size:12.5px;font-weight:700;line-height:1.35;}
@@ -380,7 +378,8 @@ let currentInspectionItemId = null;
 let currentRound = 1;
 let formItems = [];
 let aptStatusMap = new Map(); // apartmentId(string) -> {statusText, inspectionItemId}
-let aptStatusFilter = 'all'; // 'all' | 'st-notstarted' | 'st-needsr2' | 'st-r2progress' | 'st-approved'
+let aptStatusFilter = 'all'; // 'all' | 'st-new' | 'st-not-completed' | 'st-approved'
+let aptStatusLoaded = false; // guards selectApartment against acting before the status fetch completes
 
 /* ============ STORAGE / SETUP ============ */
 function loadConfig(){
@@ -506,6 +505,7 @@ async function selectProject(projId){
   document.getElementById('apt-search').value='';
   aptStatusFilter = 'all';
   aptStatusMap = new Map();
+  aptStatusLoaded = false;
   showScreen('screen-apartments');
   renderAptFilterChips();
   renderApartmentList();
@@ -520,6 +520,7 @@ async function refreshAptStatusesAndRender(){
   }catch(e){
     toast('Could not load inspection status: '+e.message);
   }
+  aptStatusLoaded = true;
   renderApartmentList();
 }
 function refreshApartmentStatusIfVisible(projectId){
@@ -528,16 +529,28 @@ function refreshApartmentStatusIfVisible(projectId){
   }
 }
 async function fetchProjectInspectionStatuses(projectId){
+  // NOTE: Monday's server-side query_params filtering on board_relation columns proved
+  // unreliable (empirically returned 0 matches for a linked item that definitely existed).
+  // The generic column_values{text value} fields also come back null for this column type —
+  // the reliable way to read a board_relation column is the typed BoardRelationValue
+  // fragment's linked_item_ids field. So this fetches the whole Inspections board (paginated,
+  // same technique as fetchAllApartments) and filters by project client-side instead of
+  // trusting Monday's server-side filter.
   const map = new Map();
   let cursor = null;
+  const targetProjectId = String(projectId);
   do{
     const q = `query($cursor:String){
       boards(ids:[${BOARD_INSPECTIONS}]){
-        items_page(limit:100, cursor:$cursor, query_params:{rules:[{column_id:"${COL.project}", compare_value:[${Number(projectId)}], operator:any_of}]}){
+        items_page(limit:100, cursor:$cursor){
           cursor
           items{
             id
-            column_values(ids:["${COL.status}","${COL.apartment}"]){ id text value }
+            column_values(ids:["${COL.status}","${COL.apartment}","${COL.project}"]){
+              id
+              text
+              ... on BoardRelationValue { linked_item_ids }
+            }
           }
         }
       }
@@ -547,8 +560,10 @@ async function fetchProjectInspectionStatuses(projectId){
     for(const it of page.items){
       const statusCol = it.column_values.find(c=>c.id===COL.status);
       const aptCol = it.column_values.find(c=>c.id===COL.apartment);
+      const projCol = it.column_values.find(c=>c.id===COL.project);
       const aptId = extractLinkedId(aptCol);
-      if(aptId!==null){
+      const projId = extractLinkedId(projCol);
+      if(aptId!==null && projId!==null && String(projId)===targetProjectId){
         map.set(String(aptId), {statusText: statusCol?statusCol.text:'', inspectionItemId: it.id});
       }
     }
@@ -557,33 +572,26 @@ async function fetchProjectInspectionStatuses(projectId){
   return map;
 }
 function extractLinkedId(col){
-  if(!col || !col.value) return null;
-  try{
-    const v = JSON.parse(col.value);
-    if(v && Array.isArray(v.linkedPulseIds) && v.linkedPulseIds.length){
-      return v.linkedPulseIds[0].linkedPulseId;
-    }
-  }catch(e){}
+  if(col && Array.isArray(col.linked_item_ids) && col.linked_item_ids.length){
+    return col.linked_item_ids[0];
+  }
   return null;
 }
 function statusBadgeFor(aptId){
   const job = findActiveJobForApartment(aptId);
-  if(job) return {label:'⏳ Syncing…', cls:'st-syncing'};
+  if(job) return {label:'⏳ Syncing…', cls:'st-not-completed'};
   const rec = aptStatusMap.get(String(aptId));
-  if(!rec || !rec.statusText) return {label:'Not Started', cls:'st-notstarted'};
-  if(rec.statusText === STATUS_LABELS.round1Submitted) return {label:'Needs Round 2', cls:'st-needsr2'};
-  if(rec.statusText === STATUS_LABELS.round2InProgress) return {label:'Round 2 In Progress', cls:'st-r2progress'};
+  if(!rec || !rec.statusText) return {label:'New', cls:'st-new'};
   if(rec.statusText === STATUS_LABELS.round2Approved) return {label:'✓ Approved', cls:'st-approved'};
-  return {label: rec.statusText, cls:'st-notstarted'};
+  return {label:'Not Completed - 2nd Inspection', cls:'st-not-completed'};
 }
 function renderAptFilterChips(){
   const wrap = document.getElementById('apt-filter-chips');
   if(!wrap) return;
   const options = [
     {key:'all', label:'All'},
-    {key:'st-notstarted', label:'Not Started'},
-    {key:'st-needsr2', label:'Needs Round 2'},
-    {key:'st-r2progress', label:'In Progress'},
+    {key:'st-new', label:'New'},
+    {key:'st-not-completed', label:'Not Completed - 2nd Inspection'},
     {key:'st-approved', label:'Approved'}
   ];
   wrap.innerHTML = options.map(o=>`<button type="button" class="filter-chip ${aptStatusFilter===o.key?'sel':''}" onclick="setAptFilter('${o.key}')">${o.label}</button>`).join('');
@@ -625,19 +633,16 @@ function renderApartmentList(){
 
   const statsEl = document.getElementById('apt-stats');
   if(statsEl && inProject.length){
-    const counts = {'st-notstarted':0,'st-needsr2':0,'st-r2progress':0,'st-approved':0,'st-syncing':0};
+    const counts = {'st-new':0,'st-not-completed':0,'st-approved':0};
     inProject.forEach(a=>{ const b = statusBadgeFor(a.id); counts[b.cls] = (counts[b.cls]||0)+1; });
-    statsEl.textContent = `${counts['st-approved']} approved · ${counts['st-needsr2']} need Round 2 · ${counts['st-r2progress']+counts['st-syncing']} in progress · ${counts['st-notstarted']} not started · ${inProject.length} total`;
+    statsEl.textContent = `${counts['st-approved']} approved · ${counts['st-not-completed']} not completed - 2nd inspection · ${counts['st-new']} new · ${inProject.length} total`;
   } else if(statsEl){
     statsEl.textContent = '';
   }
 
   let filtered = term ? inProject.filter(a=>a.name.toLowerCase().includes(term)) : inProject;
   if(aptStatusFilter !== 'all'){
-    filtered = filtered.filter(a => {
-      const cls = statusBadgeFor(a.id).cls;
-      return cls === aptStatusFilter || (aptStatusFilter==='st-r2progress' && cls==='st-syncing');
-    });
+    filtered = filtered.filter(a => statusBadgeFor(a.id).cls === aptStatusFilter);
   }
   filtered = filtered.slice(0, 150);
   if(filtered.length===0 && inProject.length>0){ list.innerHTML = '<p class="sub">No matches.</p>'; return; }
@@ -660,39 +665,29 @@ async function selectApartment(aptId){
     toast("This apartment is still syncing an earlier submission — please wait for it to finish (see the banner at the top).");
     return;
   }
+  if(!aptStatusLoaded){
+    toast("Still checking inspection status for this project — please try again in a moment.");
+    return;
+  }
   currentApartment = apartments.find(a=>a.id===aptId);
   showScreen('screen-checking');
   try{
-    const q = `query{
-      boards(ids:[${BOARD_INSPECTIONS}]){
-        items_page(limit:5, query_params:{rules:[{column_id:"${COL.apartment}", compare_value:[${Number(aptId)}], operator:any_of}]}){
-          items{
-            id
-            name
-            column_values{ id text value }
-          }
-        }
-      }
-    }`;
-    const data = await mondayApi(q);
-    const items = data.boards[0].items_page.items;
-    if(items.length === 0){
+    // Reuses the status already fetched for the whole project (see fetchProjectInspectionStatuses)
+    // instead of making its own per-apartment query — that per-apartment query used the same
+    // unreliable board_relation filtering that caused the "always Not Started" bug.
+    const rec = aptStatusMap.get(String(aptId));
+    if(!rec){
       currentInspectionItemId = null;
       currentRound = 1;
       formItems = buildFreshFormItems();
       openHeaderScreen();
+    } else if(rec.statusText === STATUS_LABELS.round2Approved){
+      toast('This apartment is already fully approved and signed.');
+      showScreen('screen-apartments');
     } else {
-      const item = items[0];
-      currentInspectionItemId = item.id;
-      const statusCol = item.column_values.find(c=>c.id===COL.status);
-      const statusLabel = statusCol ? statusCol.text : '';
-      if(statusLabel === STATUS_LABELS.round2Approved){
-        toast('This apartment is already fully approved and signed.');
-        showScreen('screen-apartments');
-        return;
-      }
+      currentInspectionItemId = rec.inspectionItemId;
       currentRound = 2;
-      await loadRound2Items(item.id);
+      await loadRound2Items(rec.inspectionItemId);
       openHeaderScreen();
     }
   }catch(e){
