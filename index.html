@@ -408,13 +408,17 @@ async function mondayApi(query, variables){
   }
   return json.data;
 }
+// Monday's /v2/file endpoint doesn't support CORS for direct browser uploads (a known,
+// unresolved limitation on Monday's side). This relays the upload through a tiny Cloudflare
+// Worker that forwards it to Monday server-to-server, where CORS doesn't apply.
+const MONDAY_FILE_RELAY = 'https://little-poetry-f71b.tomerg1992.workers.dev/';
 async function mondayFileUpload(query, itemId, columnId, file){
   const form = new FormData();
   form.append('query', query);
   form.append('variables[item_id]', itemId);
   form.append('variables[column_id]', columnId);
   form.append('variables[file]', file, file.name || 'photo.jpg');
-  const res = await fetch('https://api.monday.com/v2/file', {
+  const res = await fetch(MONDAY_FILE_RELAY, {
     method:'POST',
     headers:{ 'Authorization': MONDAY_TOKEN },
     body: form
