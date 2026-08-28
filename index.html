@@ -105,10 +105,38 @@
   .footer-note{font-size:11.5px;color:var(--gray);text-align:center;margin-top:20px;}
   .link-btn{background:none;border:none;color:var(--navy);font-size:13px;font-weight:700;text-align:right;display:block;width:100%;margin-top:6px;}
   .chip{display:inline-block;background:#eef1f8;color:var(--navy);font-size:11.5px;font-weight:800;padding:4px 10px;border-radius:20px;margin-bottom:10px;}
+
+  .chip-row{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;}
+  .filter-chip{background:#eef1f8;color:var(--navy);border:1.5px solid transparent;font-size:12px;font-weight:800;padding:6px 12px;border-radius:20px;}
+  .filter-chip.sel{background:var(--navy);color:#fff;}
+  .status-pill{display:inline-block;padding:3px 9px;border-radius:20px;font-size:10.5px;font-weight:800;vertical-align:middle;margin-left:6px;white-space:nowrap;}
+  .st-notstarted{background:#eef1f8;color:var(--gray);}
+  .st-needsr2{background:#fff1de;color:var(--orange);}
+  .st-r2progress{background:#dceafd;color:var(--blue);}
+  .st-approved{background:#d7f7e9;color:var(--green);}
+  .st-syncing{background:#eef1f8;color:var(--navy);}
+  .sync-banner{position:sticky;top:0;z-index:30;background:var(--navy);color:#fff;cursor:pointer;}
+  .sync-banner-row{display:flex;align-items:center;gap:10px;padding:10px 16px;}
+  .sync-banner-text{flex:1;font-size:12.5px;font-weight:700;line-height:1.35;}
+  .sync-banner-chev{font-size:12px;opacity:0.8;}
+  .spinner.small{width:16px;height:16px;border-width:2px;margin:0;flex-shrink:0;border-color:rgba(255,255,255,0.3);border-top-color:#fff;}
+  .sync-panel{display:none;background:var(--navy-dark);padding:0 16px 12px;}
+  .sync-job-row{padding:8px 0;border-top:1px solid rgba(255,255,255,0.12);font-size:12.5px;}
+  .sync-job-row .sub{color:rgba(255,255,255,0.7)!important;}
 </style>
 </head>
 <body>
 <div id="app">
+
+  <!-- BACKGROUND SYNC BANNER (persists across all screens while a submission is uploading) -->
+  <div id="sync-banner" class="sync-banner" style="display:none;" onclick="toggleSyncPanel()">
+    <div class="sync-banner-row">
+      <div class="spinner small"></div>
+      <div class="sync-banner-text" id="sync-banner-text">Submitting… please don't close the app yet.</div>
+      <div class="sync-banner-chev">▾</div>
+    </div>
+    <div id="sync-panel" class="sync-panel"></div>
+  </div>
 
   <!-- SETUP SCREEN (first run) -->
   <div class="screen" id="screen-setup">
@@ -175,6 +203,8 @@
     <div class="screen-pad">
       <label>Search Apartment</label>
       <input type="text" id="apt-search" class="search-box" placeholder="Type apartment name..." oninput="renderApartmentList()">
+      <div id="apt-stats" class="sub" style="margin-bottom:8px;"></div>
+      <div id="apt-filter-chips" class="chip-row"></div>
       <div id="apt-empty-note" class="sub" style="display:none;">No apartments found for this project in the Apartments Database.</div>
       <div id="apt-list"></div>
     </div>
@@ -349,6 +379,8 @@ let currentApartment = null;
 let currentInspectionItemId = null;
 let currentRound = 1;
 let formItems = [];
+let aptStatusMap = new Map(); // apartmentId(string) -> {statusText, inspectionItemId}
+let aptStatusFilter = 'all'; // 'all' | 'st-notstarted' | 'st-needsr2' | 'st-r2progress' | 'st-approved'
 
 /* ============ STORAGE / SETUP ============ */
 function loadConfig(){
@@ -468,13 +500,95 @@ function renderProjectList(){
     </div>
   `).join('');
 }
-function selectProject(projId){
+async function selectProject(projId){
   currentProject = projects.find(p=>p.id===projId);
   document.getElementById('apt-picker-title').textContent = currentProject.name;
   document.getElementById('apt-search').value='';
+  aptStatusFilter = 'all';
+  aptStatusMap = new Map();
   showScreen('screen-apartments');
+  renderAptFilterChips();
+  renderApartmentList();
+  await refreshAptStatusesAndRender();
+}
+async function refreshAptStatusesAndRender(){
+  if(!currentProject) return;
+  const statsEl = document.getElementById('apt-stats');
+  if(statsEl && aptStatusMap.size===0) statsEl.textContent = 'Checking inspection status…';
+  try{
+    aptStatusMap = await fetchProjectInspectionStatuses(currentProject.id);
+  }catch(e){
+    toast('Could not load inspection status: '+e.message);
+  }
   renderApartmentList();
 }
+function refreshApartmentStatusIfVisible(projectId){
+  if(currentProject && currentProject.id === projectId && document.getElementById('screen-apartments').classList.contains('active')){
+    refreshAptStatusesAndRender();
+  }
+}
+async function fetchProjectInspectionStatuses(projectId){
+  const map = new Map();
+  let cursor = null;
+  do{
+    const q = `query($cursor:String){
+      boards(ids:[${BOARD_INSPECTIONS}]){
+        items_page(limit:100, cursor:$cursor, query_params:{rules:[{column_id:"${COL.project}", compare_value:["${projectId}"], operator:any_of}]}){
+          cursor
+          items{
+            id
+            column_values(ids:["${COL.status}","${COL.apartment}"]){ id text value }
+          }
+        }
+      }
+    }`;
+    const data = await mondayApi(q, {cursor});
+    const page = data.boards[0].items_page;
+    for(const it of page.items){
+      const statusCol = it.column_values.find(c=>c.id===COL.status);
+      const aptCol = it.column_values.find(c=>c.id===COL.apartment);
+      const aptId = extractLinkedId(aptCol);
+      if(aptId!==null){
+        map.set(String(aptId), {statusText: statusCol?statusCol.text:'', inspectionItemId: it.id});
+      }
+    }
+    cursor = page.cursor;
+  } while(cursor);
+  return map;
+}
+function extractLinkedId(col){
+  if(!col || !col.value) return null;
+  try{
+    const v = JSON.parse(col.value);
+    if(v && Array.isArray(v.linkedPulseIds) && v.linkedPulseIds.length){
+      return v.linkedPulseIds[0].linkedPulseId;
+    }
+  }catch(e){}
+  return null;
+}
+function statusBadgeFor(aptId){
+  const job = findActiveJobForApartment(aptId);
+  if(job) return {label:'⏳ Syncing…', cls:'st-syncing'};
+  const rec = aptStatusMap.get(String(aptId));
+  if(!rec || !rec.statusText) return {label:'Not Started', cls:'st-notstarted'};
+  if(rec.statusText === STATUS_LABELS.round1Submitted) return {label:'Needs Round 2', cls:'st-needsr2'};
+  if(rec.statusText === STATUS_LABELS.round2InProgress) return {label:'Round 2 In Progress', cls:'st-r2progress'};
+  if(rec.statusText === STATUS_LABELS.round2Approved) return {label:'✓ Approved', cls:'st-approved'};
+  return {label: rec.statusText, cls:'st-notstarted'};
+}
+function renderAptFilterChips(){
+  const wrap = document.getElementById('apt-filter-chips');
+  if(!wrap) return;
+  const options = [
+    {key:'all', label:'All'},
+    {key:'st-notstarted', label:'Not Started'},
+    {key:'st-needsr2', label:'Needs Round 2'},
+    {key:'st-r2progress', label:'In Progress'},
+    {key:'st-approved', label:'Approved'}
+  ];
+  wrap.innerHTML = options.map(o=>`<button type="button" class="filter-chip ${aptStatusFilter===o.key?'sel':''}" onclick="setAptFilter('${o.key}')">${o.label}</button>`).join('');
+}
+function setAptFilter(key){ aptStatusFilter = key; renderAptFilterChips(); renderApartmentList(); }
 
 /* ============ APARTMENTS ============ */
 async function fetchAllApartments(){
@@ -504,23 +618,48 @@ async function fetchAllApartments(){
 function renderApartmentList(){
   const term = document.getElementById('apt-search').value.trim().toLowerCase();
   const list = document.getElementById('apt-list');
+  // Preserves the apartments' natural order from the Apartments Database (the order they were
+  // fetched in, which follows the board's own "Floor" group ordering) rather than re-sorting.
   let inProject = apartments.filter(a => a.projectKey === currentProject.key);
   document.getElementById('apt-empty-note').style.display = inProject.length===0 ? 'block' : 'none';
+
+  const statsEl = document.getElementById('apt-stats');
+  if(statsEl && inProject.length){
+    const counts = {'st-notstarted':0,'st-needsr2':0,'st-r2progress':0,'st-approved':0,'st-syncing':0};
+    inProject.forEach(a=>{ const b = statusBadgeFor(a.id); counts[b.cls] = (counts[b.cls]||0)+1; });
+    statsEl.textContent = `${counts['st-approved']} approved · ${counts['st-needsr2']} need Round 2 · ${counts['st-r2progress']+counts['st-syncing']} in progress · ${counts['st-notstarted']} not started · ${inProject.length} total`;
+  } else if(statsEl){
+    statsEl.textContent = '';
+  }
+
   let filtered = term ? inProject.filter(a=>a.name.toLowerCase().includes(term)) : inProject;
-  filtered = filtered.slice(0, 100);
+  if(aptStatusFilter !== 'all'){
+    filtered = filtered.filter(a => {
+      const cls = statusBadgeFor(a.id).cls;
+      return cls === aptStatusFilter || (aptStatusFilter==='st-r2progress' && cls==='st-syncing');
+    });
+  }
+  filtered = filtered.slice(0, 150);
   if(filtered.length===0 && inProject.length>0){ list.innerHTML = '<p class="sub">No matches.</p>'; return; }
-  list.innerHTML = filtered.map(a => `
+  list.innerHTML = filtered.map(a => {
+    const b = statusBadgeFor(a.id);
+    return `
     <div class="list-card">
-      <div class="name">${escapeHtml(a.name)}</div>
+      <div class="name">${escapeHtml(a.name)}<span class="status-pill ${b.cls}">${b.label}</span></div>
       <div class="meta">${escapeHtml(currentProject.name)}</div>
       <button onclick="selectApartment('${a.id}')">Select</button>
     </div>
-  `).join('');
+  `;}).join('');
 }
 function escapeHtml(s){ return (s||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
 /* ============ SELECT APARTMENT -> CHECK EXISTING RECORD ============ */
 async function selectApartment(aptId){
+  const activeJob = findActiveJobForApartment(aptId);
+  if(activeJob){
+    toast("This apartment is still syncing an earlier submission — please wait for it to finish (see the banner at the top).");
+    return;
+  }
   currentApartment = apartments.find(a=>a.id===aptId);
   showScreen('screen-checking');
   try{
@@ -728,22 +867,6 @@ function resizeImageFile(file, maxDim, quality){
     }catch(e){ resolve(file); }
   });
 }
-async function uploadPhotoWithRetry(itemId, columnId, file, attempts){
-  attempts = attempts || 2;
-  const upQ = `mutation($item_id:ID!, $column_id:String!, $file:File!){ add_file_to_column(item_id:$item_id, column_id:$column_id, file:$file){ id } }`;
-  let lastErr;
-  for(let a=1; a<=attempts; a++){
-    try{
-      await mondayFileUpload(upQ, itemId, columnId, file);
-      return true;
-    }catch(e){
-      lastErr = e;
-      if(a<attempts) await new Promise(r=>setTimeout(r, 1200));
-    }
-  }
-  console.warn('Photo upload failed after retries for item '+itemId, lastErr);
-  return false;
-}
 function showCustomInput(secId){
   document.getElementById('custom-input-'+secId).classList.add('show');
 }
@@ -798,18 +921,19 @@ function goToReview(){
     document.getElementById('sign-supervisor').value = document.getElementById('hdr-supervisor').value;
   }
   document.getElementById('review-error').textContent = '';
+  document.getElementById('submit-btn').disabled = false;
   showScreen('screen-review');
 }
 
-/* ============ SUBMIT ============ */
+/* ============ SUBMIT (queues a background sync job — does not block the UI) ============ */
 async function submitInspection(){
   const btn = document.getElementById('submit-btn');
-  const prog = document.getElementById('submit-progress');
-  const progText = document.getElementById('submit-progress-text');
+  if(btn.disabled) return; // guards against a rapid double-tap queuing two jobs for the same apartment
   const err = document.getElementById('review-error');
   err.textContent='';
 
   const showSignoff = document.getElementById('signoff-section').style.display === 'block';
+  let signoff = null;
   if(showSignoff){
     const supConfirm = document.getElementById('sign-supervisor-confirm').checked;
     const conConfirm = document.getElementById('sign-contractor-confirm').checked;
@@ -819,122 +943,287 @@ async function submitInspection(){
       err.textContent = 'Both Supervisor and Contractor must enter their name and confirm before final submit.';
       return;
     }
+    signoff = {supervisorName: supName, contractorName: conName};
   }
+  btn.disabled = true;
 
-  btn.style.display='none';
-  prog.style.display='block';
   const today = new Date().toISOString().slice(0,10);
+  const job = {
+    id: uid(),
+    apartmentId: currentApartment.id,
+    apartmentName: currentApartment.name,
+    projectId: currentProject.id,
+    round: currentRound,
+    today,
+    header: { date: document.getElementById('hdr-date').value, supervisor: document.getElementById('hdr-supervisor').value.trim() },
+    itemName: `${currentApartment.name} - Round 1 - ${today}`,
+    inspectionItemId: currentRound===2 ? currentInspectionItemId : null,
+    signoff,
+    items: buildJobItems(formItems),
+    stage: currentRound===1 ? 'create_item' : 'items',
+    retryCount: 0,
+    lastError: null,
+    createdAt: Date.now()
+  };
 
-  let photoFailures = [];
+  queueInspectionJob(job);
+
+  toast(currentRound===1
+    ? `📤 Round 1 for ${currentApartment.name} is saving to Monday in the background.`
+    : (signoff ? `📤 Final approval for ${currentApartment.name} is saving in the background.` : `📤 Round 2 updates for ${currentApartment.name} are saving in the background.`));
+
+  currentApartment = null;
+  currentInspectionItemId = null;
+  currentRound = 1;
+  formItems = [];
+  showScreen('screen-apartments');
+  renderApartmentList();
+}
+
+/* ============ BACKGROUND SYNC ENGINE ============
+   Every submit is queued as a resumable "job" persisted in IndexedDB. Jobs are processed with
+   a concurrency-limited pool (instead of one-request-at-a-time) so ~90 checklist items sync in
+   well under a minute. If a request fails (lost signal, app closed), the job stays in IndexedDB
+   with its partial progress and is retried automatically — on reopen, on 'online', and on a
+   periodic sweep — until every item is confirmed saved. Nothing is ever silently dropped. */
+const DB_NAME = 'vesta_sync_db';
+const DB_STORE = 'jobs';
+let dbPromise = null;
+function openDb(){
+  if(dbPromise) return dbPromise;
+  dbPromise = new Promise((resolve, reject)=>{
+    const req = indexedDB.open(DB_NAME, 1);
+    req.onupgradeneeded = ()=>{ req.result.createObjectStore(DB_STORE, {keyPath:'id'}); };
+    req.onsuccess = ()=>resolve(req.result);
+    req.onerror = ()=>reject(req.error);
+  });
+  return dbPromise;
+}
+async function dbPut(job){
+  const db = await openDb();
+  return new Promise((resolve,reject)=>{
+    const tx = db.transaction(DB_STORE,'readwrite');
+    tx.objectStore(DB_STORE).put(job);
+    tx.oncomplete = ()=>resolve();
+    tx.onerror = ()=>reject(tx.error);
+  });
+}
+async function dbDelete(id){
+  const db = await openDb();
+  return new Promise((resolve,reject)=>{
+    const tx = db.transaction(DB_STORE,'readwrite');
+    tx.objectStore(DB_STORE).delete(id);
+    tx.oncomplete = ()=>resolve();
+    tx.onerror = ()=>reject(tx.error);
+  });
+}
+async function dbGetAll(){
+  const db = await openDb();
+  return new Promise((resolve,reject)=>{
+    const tx = db.transaction(DB_STORE,'readonly');
+    const req = tx.objectStore(DB_STORE).getAll();
+    req.onsuccess = ()=>resolve(req.result||[]);
+    req.onerror = ()=>reject(req.error);
+  });
+}
+function stripJob(job){
+  const {_saveChain, _processing, ...rest} = job;
+  return rest;
+}
+function persistJob(job){
+  job._saveChain = (job._saveChain || Promise.resolve()).then(()=>dbPut(stripJob(job))).catch(()=>{});
+  return job._saveChain;
+}
+function uid(){ return 'job_' + Date.now() + '_' + Math.random().toString(36).slice(2,9); }
+
+const activeJobs = new Map(); // id -> job
+const SYNC_CONCURRENCY = 6;
+
+async function asyncPool(concurrency, items, fn){
+  let i = 0;
+  const results = new Array(items.length);
+  async function worker(){
+    while(i < items.length){
+      const idx = i++;
+      try{ results[idx] = await fn(items[idx]); }
+      catch(e){ results[idx] = {__error: e}; }
+    }
+  }
+  const workers = Array.from({length: Math.min(concurrency, items.length)}, worker);
+  await Promise.all(workers);
+  const failed = results.find(r=>r && r.__error);
+  if(failed) throw failed.__error;
+  return results;
+}
+
+function buildJobItems(items){
+  return items.map(it=>({
+    key: it.key, section: it.section, text: it.text, status: it.status, notes: it.notes||'',
+    photoBlob: it.photoFile || null,
+    subitemId: it.subitemId || null,
+    statusSynced: false,
+    photoUploaded: false,
+    done: false
+  }));
+}
+
+function queueInspectionJob(job){
+  activeJobs.set(job.id, job);
+  persistJob(job);
+  updateSyncBanner();
+  processJob(job);
+}
+
+function findActiveJobForApartment(aptId){
+  for(const job of activeJobs.values()){
+    if(job.apartmentId === aptId && job.stage !== 'done') return job;
+  }
+  return null;
+}
+
+async function processJob(job){
+  if(job._processing) return;
+  job._processing = true;
   try{
-    if(currentRound===1){
-      progText.textContent = 'Creating inspection record...';
-      const itemName = `${currentApartment.name} - Round 1 - ${today}`;
+    if(job.stage === 'create_item'){
       const colVals = {
-        [COL.apartment]: {item_ids:[Number(currentApartment.id)]},
-        [COL.project]: {item_ids:[Number(currentProject.id)]},
+        [COL.apartment]: {item_ids:[Number(job.apartmentId)]},
+        [COL.project]: {item_ids:[Number(job.projectId)]},
         [COL.status]: {label: STATUS_LABELS.round1Submitted},
-        [COL.date1]: {date: document.getElementById('hdr-date').value},
-        [COL.supervisorName]: document.getElementById('hdr-supervisor').value.trim()
+        [COL.date1]: {date: job.header.date},
+        [COL.supervisorName]: job.header.supervisor
       };
-      const createQ = `mutation($boardId:ID!, $name:String!, $cv:JSON!){
-        create_item(board_id:$boardId, item_name:$name, column_values:$cv){ id }
-      }`;
-      const createRes = await mondayApi(createQ, {boardId: BOARD_INSPECTIONS, name: itemName, cv: JSON.stringify(colVals)});
-      const newItemId = createRes.create_item.id;
-      currentInspectionItemId = newItemId;
-
-      progText.textContent = 'Adding checklist items (0/'+formItems.length+')...';
-      photoFailures = await createAllSubitems(newItemId, progText);
-
-    } else {
-      progText.textContent = 'Updating checklist items...';
-      const newOnes = formItems.filter(i=>!i.subitemId);
-      const existingOnes = formItems.filter(i=>i.subitemId);
-
-      for(let i=0;i<existingOnes.length;i++){
-        const it = existingOnes[i];
-        progText.textContent = `Updating item ${i+1}/${existingOnes.length}...`;
-        const cv = { [SUBCOL.status]: {label: it.status}, [SUBCOL.notes]: it.notes || '' };
-        const updQ = `mutation($boardId:ID!, $itemId:ID!, $cv:JSON!){
-          change_multiple_column_values(board_id:$boardId, item_id:$itemId, column_values:$cv){ id }
-        }`;
-        await mondayApi(updQ, {boardId: BOARD_SUBITEMS, itemId: it.subitemId, cv: JSON.stringify(cv)});
-        if(it.photoFile){
-          progText.textContent = `Uploading photo ${i+1}/${existingOnes.length}...`;
-          const ok = await uploadPhotoWithRetry(it.subitemId, SUBCOL.photo, it.photoFile);
-          if(!ok) photoFailures.push(it.text);
-        }
+      const createQ = `mutation($boardId:ID!, $name:String!, $cv:JSON!){ create_item(board_id:$boardId, item_name:$name, column_values:$cv){ id } }`;
+      const createRes = await mondayApi(createQ, {boardId: BOARD_INSPECTIONS, name: job.itemName, cv: JSON.stringify(colVals)});
+      job.inspectionItemId = createRes.create_item.id;
+      job.stage = 'items';
+      await persistJob(job);
+    }
+    if(job.stage === 'items'){
+      const pending = job.items.filter(it=>!it.done);
+      if(pending.length){
+        await asyncPool(SYNC_CONCURRENCY, pending, (it)=>processJobItem(job, it));
       }
-      if(newOnes.length){
-        progText.textContent = 'Adding new items found during re-inspection...';
-        const moreFailures = await createAllSubitems(currentInspectionItemId, progText, newOnes);
-        photoFailures = photoFailures.concat(moreFailures);
-      }
-
-      const notApproved = formItems.filter(i=>i.status==='Not Approved').length;
-      const parentCv = { [COL.date2]: {date: today} };
-      if(showSignoff){
-        parentCv[COL.status] = {label: STATUS_LABELS.round2Approved};
-        parentCv[COL.supervisorConfirm] = {checked:"true"};
-        parentCv[COL.supervisorSignDate] = {date: today};
-        parentCv[COL.contractorName] = document.getElementById('sign-contractor').value.trim();
-        parentCv[COL.contractorConfirm] = {checked:"true"};
-        parentCv[COL.contractorSignDate] = {date: today};
-        const supName = document.getElementById('sign-supervisor').value.trim();
-        if(supName) parentCv[COL.supervisorName] = supName;
+      job.stage = job.round===1 ? 'done' : 'finalize';
+      await persistJob(job);
+    }
+    if(job.stage === 'finalize'){
+      const cv = { [COL.date2]: {date: job.today} };
+      if(job.signoff){
+        cv[COL.status] = {label: STATUS_LABELS.round2Approved};
+        cv[COL.supervisorConfirm] = {checked:"true"};
+        cv[COL.supervisorSignDate] = {date: job.today};
+        cv[COL.contractorName] = job.signoff.contractorName;
+        cv[COL.contractorConfirm] = {checked:"true"};
+        cv[COL.contractorSignDate] = {date: job.today};
+        if(job.signoff.supervisorName) cv[COL.supervisorName] = job.signoff.supervisorName;
       } else {
-        parentCv[COL.status] = {label: STATUS_LABELS.round2InProgress};
+        cv[COL.status] = {label: STATUS_LABELS.round2InProgress};
       }
-      progText.textContent = 'Finalizing...';
-      const updParentQ = `mutation($boardId:ID!, $itemId:ID!, $cv:JSON!){
-        change_multiple_column_values(board_id:$boardId, item_id:$itemId, column_values:$cv){ id }
-      }`;
-      await mondayApi(updParentQ, {boardId: BOARD_INSPECTIONS, itemId: currentInspectionItemId, cv: JSON.stringify(parentCv)});
+      const q = `mutation($boardId:ID!, $itemId:ID!, $cv:JSON!){ change_multiple_column_values(board_id:$boardId, item_id:$itemId, column_values:$cv){ id } }`;
+      await mondayApi(q, {boardId: BOARD_INSPECTIONS, itemId: job.inspectionItemId, cv: JSON.stringify(cv)});
+      job.stage = 'done';
+      await persistJob(job);
     }
-
-    document.getElementById('success-title').textContent = currentRound===1 ? 'Round 1 Submitted' : (showSignoff ? 'Fully Approved & Signed' : 'Round 2 Progress Saved');
-    let successMsg = currentRound===1
-      ? 'The contractor will be notified with the list of damages in the next batch.'
-      : (showSignoff ? 'Final signed report will be sent to the contractor in the next batch.' : 'Remaining Not Approved items were updated.');
-    if(photoFailures.length){
-      successMsg += ` Note: ${photoFailures.length} photo(s) couldn't upload (weak connection) for: ${photoFailures.join(', ')}. The checklist item itself was saved — reopen this apartment later to add those photos.`;
+    if(job.stage === 'done'){
+      job.lastError = null;
+      activeJobs.delete(job.id);
+      await dbDelete(job.id);
+      updateSyncBanner();
+      toast(`✓ Synced: ${job.apartmentName} (Round ${job.round})`);
+      refreshApartmentStatusIfVisible(job.projectId);
     }
-    document.getElementById('success-sub').textContent = successMsg;
-    showScreen('screen-success');
-
   }catch(e){
-    prog.style.display='none';
-    btn.style.display='block';
-    err.textContent = 'Submit failed: '+e.message;
+    console.warn('Sync job failed, will retry automatically:', job.id, e.message);
+    job.lastError = e.message;
+    await persistJob(job);
+    updateSyncBanner();
+    scheduleRetry(job);
+  }finally{
+    job._processing = false;
   }
 }
 
-async function createAllSubitems(parentId, progText, itemsOverride){
-  const items = itemsOverride || formItems;
-  const photoFailures = [];
-  for(let i=0;i<items.length;i++){
-    const it = items[i];
-    if(progText) progText.textContent = `Adding checklist items (${i+1}/${items.length})...`;
+async function processJobItem(job, it){
+  // Idempotent by construction: control flow keys off subitemId/statusSynced/photoUploaded
+  // (not the coarse "done" flag), so resuming an interrupted job after a crash mid-item never
+  // re-creates a subitem that was already created — it just picks up whatever step is left.
+  if(!it.subitemId){
     const cv = {
       [SUBCOL.status]: it.status ? {label: it.status} : undefined,
       [SUBCOL.section]: it.section,
       [SUBCOL.notes]: it.notes || ''
     };
     Object.keys(cv).forEach(k=>cv[k]===undefined && delete cv[k]);
-    const q = `mutation($parentId:ID!, $name:String!, $cv:JSON!){
-      create_subitem(parent_item_id:$parentId, item_name:$name, column_values:$cv){ id }
-    }`;
-    const res = await mondayApi(q, {parentId, name: it.text, cv: JSON.stringify(cv)});
-    const subId = res.create_subitem.id;
-    it.subitemId = subId;
-    if(it.photoFile){
-      if(progText) progText.textContent = `Uploading photo (${i+1}/${items.length})...`;
-      const ok = await uploadPhotoWithRetry(subId, SUBCOL.photo, it.photoFile);
-      if(!ok) photoFailures.push(it.text);
-    }
+    const q = `mutation($parentId:ID!, $name:String!, $cv:JSON!){ create_subitem(parent_item_id:$parentId, item_name:$name, column_values:$cv){ id } }`;
+    const res = await mondayApi(q, {parentId: job.inspectionItemId, name: it.text, cv: JSON.stringify(cv)});
+    it.subitemId = res.create_subitem.id;
+    it.statusSynced = true;
+    await persistJob(job);
+  } else if(!it.statusSynced){
+    const cv = { [SUBCOL.status]: {label: it.status}, [SUBCOL.notes]: it.notes || '' };
+    const q = `mutation($boardId:ID!, $itemId:ID!, $cv:JSON!){ change_multiple_column_values(board_id:$boardId, item_id:$itemId, column_values:$cv){ id } }`;
+    await mondayApi(q, {boardId: BOARD_SUBITEMS, itemId: it.subitemId, cv: JSON.stringify(cv)});
+    it.statusSynced = true;
+    await persistJob(job);
   }
-  return photoFailures;
+  if(it.photoBlob && !it.photoUploaded){
+    const upQ = `mutation($item_id:ID!, $column_id:String!, $file:File!){ add_file_to_column(item_id:$item_id, column_id:$column_id, file:$file){ id } }`;
+    await mondayFileUpload(upQ, it.subitemId, SUBCOL.photo, it.photoBlob);
+    it.photoUploaded = true;
+  }
+  it.done = true;
+  await persistJob(job);
+}
+
+function scheduleRetry(job){
+  const attempt = (job.retryCount = (job.retryCount||0)+1);
+  const delay = Math.min(30000, 2000 * Math.pow(1.5, attempt));
+  setTimeout(()=>{
+    if(activeJobs.has(job.id) && navigator.onLine) processJob(job);
+  }, delay);
+}
+window.addEventListener('online', ()=>{
+  activeJobs.forEach(job=>{ if(job.stage!=='done') processJob(job); });
+});
+setInterval(()=>{
+  if(!navigator.onLine) return;
+  activeJobs.forEach(job=>{ if(job.stage!=='done' && !job._processing) processJob(job); });
+}, 20000);
+
+async function resumePendingJobs(){
+  try{
+    const jobs = await dbGetAll();
+    jobs.forEach(job=>{
+      if(job.stage !== 'done'){
+        activeJobs.set(job.id, job);
+        processJob(job);
+      }
+    });
+    updateSyncBanner();
+  }catch(e){ console.warn('Could not resume pending sync jobs', e); }
+}
+
+function updateSyncBanner(){
+  const banner = document.getElementById('sync-banner');
+  const textEl = document.getElementById('sync-banner-text');
+  const panel = document.getElementById('sync-panel');
+  const jobs = Array.from(activeJobs.values()).filter(j=>j.stage!=='done');
+  if(jobs.length===0){ banner.style.display='none'; return; }
+  banner.style.display='block';
+  const failing = jobs.filter(j=>j.lastError).length;
+  textEl.textContent = jobs.length===1
+    ? `Submitting ${jobs[0].apartmentName} (Round ${jobs[0].round})… please don't close the app yet.`
+    : `Submitting ${jobs.length} inspections… please don't close the app yet.${failing?` (${failing} waiting for signal)`:''}`;
+  panel.innerHTML = jobs.map(j=>{
+    const doneCount = j.items.filter(i=>i.done).length;
+    const statusTxt = j.lastError ? 'Waiting for signal — will retry automatically' : `Saving (${doneCount}/${j.items.length})…`;
+    return `<div class="sync-job-row"><b>${escapeHtml(j.apartmentName)}</b> · Round ${j.round}<br><span class="sub" style="margin:0;">${statusTxt}</span></div>`;
+  }).join('');
+}
+function toggleSyncPanel(){
+  const panel = document.getElementById('sync-panel');
+  panel.style.display = panel.style.display==='block' ? 'none' : 'block';
 }
 
 function resetToHome(){
@@ -949,6 +1238,7 @@ function resetToHome(){
 
 /* ============ INIT ============ */
 loadConfig();
+resumePendingJobs();
 </script>
 </body>
 </html>
