@@ -85,6 +85,11 @@
   .section-head{background:#f5f6f8;padding:12px 14px;font-weight:800;font-size:13.5px;display:flex;justify-content:space-between;align-items:center;color:var(--navy);}
   .section-count{font-size:12px;color:var(--gray);font-weight:700;}
   .item-row{padding:14px;border-top:1px solid #eee;}
+  .item-row.missing-status-flash{animation:missingStatusPulse 1.8s ease;}
+  @keyframes missingStatusPulse{
+    0%{background:#fff1f1;box-shadow:inset 0 0 0 2px var(--red);}
+    100%{background:transparent;box-shadow:inset 0 0 0 2px transparent;}
+  }
   .item-row .item-text{font-size:14.5px;margin-bottom:10px;line-height:1.35;}
   .status-toggle{display:flex;gap:6px;}
   .status-toggle button{flex:1;padding:11px 4px;font-size:12.5px;font-weight:800;border-radius:8px;border:1.5px solid var(--border);background:#fff;color:var(--gray);}
@@ -410,7 +415,7 @@ const APT_COL = {
 const PROJECT_COL = {
   contractor: "connect_boards2__1" // "Contractor" board_relation column on PROJECTS, links to SUPPLIERS
 };
-const APP_VERSION = "2026-08-28.10";
+const APP_VERSION = "2026-08-28.11";
 // Members of the "VESTA" team on Monday, used to populate the Supervisor/Inspector pickers.
 // Kept as a plain static list rather than fetched live from Monday's teams/users API — that API
 // call came back empty for this app's token (likely a permission/scope restriction on reading
@@ -538,11 +543,11 @@ function showScreen(id){
   document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
   document.getElementById(id).classList.add('active');
 }
-function toast(msg){
+function toast(msg, durationMs){
   const t = document.createElement('div');
   t.className='toast'; t.textContent=msg;
   document.body.appendChild(t);
-  setTimeout(()=>t.remove(), 3000);
+  setTimeout(()=>t.remove(), durationMs || 3000);
 }
 
 /* ============ MONDAY API HELPERS ============ */
@@ -1390,9 +1395,15 @@ function confirmLeaveChecklist(){
 
 /* ============ REVIEW ============ */
 function goToReview(){
-  const unchecked = formItems.filter(i=>!i.status).length;
-  if(unchecked > 0){
-    if(!confirm(unchecked+' item(s) are not marked yet. Continue to review anyway?')) return;
+  // Hard block, not a confirm-through-it warning: every item must be explicitly Approved / Not
+  // Approved / Not Relevant before the inspector can move on — jump them straight to the first
+  // one still missing a status instead of just saying how many are left.
+  const uncheckedIdx = formItems.findIndex(i=>!i.status);
+  if(uncheckedIdx !== -1){
+    const unchecked = formItems.filter(i=>!i.status).length;
+    toast(`${unchecked} item(s) still need a status (Approved / Not Approved / Not Relevant) before you can continue.`);
+    flashMissingStatusItem(uncheckedIdx);
+    return;
   }
   const approved = formItems.filter(i=>i.status==='Approved').length;
   const notApproved = formItems.filter(i=>i.status==='Not Approved').length;
@@ -1422,6 +1433,15 @@ function goToReview(){
     // until the screen (and the signoff section within it) is actually visible before init'ing.
     requestAnimationFrame(initContractorSignaturePad);
   }
+}
+// Scrolls the checklist to the first item still missing a status and briefly highlights it, so
+// "N items still need a status" isn't a dead end on a ~90-item list.
+function flashMissingStatusItem(idx){
+  const row = document.querySelector(`.item-row[data-idx="${idx}"]`);
+  if(!row) return;
+  row.scrollIntoView({behavior:'smooth', block:'center'});
+  row.classList.add('missing-status-flash');
+  setTimeout(()=>row.classList.remove('missing-status-flash'), 1800);
 }
 
 /* ============ CONTRACTOR SIGNATURE PAD ============ */
@@ -1737,7 +1757,7 @@ async function processJob(job){
           job.stage = 'done';
           job.lastError = null;
           await persistJob(job);
-          toast(`⚠️ ${job.apartmentName}: sign-off was saved, but the PDF report could not be generated (${e.message}).`);
+          toast(`⚠️ ${job.apartmentName}: sign-off was saved, but the PDF report could not be generated (${e.message}).`, 8000);
         } else {
           job.lastError = e.message;
           await persistJob(job);
@@ -1804,7 +1824,7 @@ async function processJobItem(job, it){
       if(it.photoAttempts >= 3){
         it.photoUploaded = 'failed'; // truthy — stops this item from being retried again
         it.photoFailReason = e.message;
-        toast(`⚠️ Photo for "${it.text}" could not be uploaded after 3 tries — the rest of the inspection was saved.`);
+        toast(`⚠️ Photo for "${it.text}" could not be uploaded after 3 tries (${e.message}) — the rest of the inspection was saved.`, 8000);
       } else {
         await persistJob(job);
         throw e; // let the outer job retry/backoff (see processJob/scheduleRetry) try again shortly
