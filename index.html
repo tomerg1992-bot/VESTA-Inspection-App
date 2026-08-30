@@ -4,6 +4,13 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>VESTA Deliveries</title>
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="VESTA Deliveries">
@@ -46,7 +53,11 @@
   .brand-logo{height:30px;width:auto;flex-shrink:0;display:flex;align-items:center;}
   .brand-logo img{height:100%;width:auto;object-fit:contain;display:block;}
   .brand-text .app-name{font-size:17px;font-weight:800;letter-spacing:0.3px;}
-  .brand-text .app-sub{font-size:11.5px;color:rgba(255,255,255,0.6);margin-top:3px;letter-spacing:0.2px;}
+  .brand-header .app-sub{
+    font-family:'Poppins',-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
+    font-size:13px;font-weight:600;text-align:center;letter-spacing:1.4px;text-transform:uppercase;
+    color:rgba(255,255,255,0.88);margin-top:16px;position:relative;z-index:1;
+  }
   .brand-header .lock-icon{margin-left:auto;background:none;border:none;color:rgba(255,255,255,0.75);font-size:20px;padding:6px;}
   .brand-header .back-icon{background:none;border:none;color:#fff;font-size:22px;padding:0 6px 0 0;}
 
@@ -60,6 +71,11 @@
   .list-card .meta{color:var(--gray);font-size:12.5px;margin-top:2px;}
   .list-card button{background:var(--navy);color:#fff;border:none;border-radius:8px;padding:9px 16px;font-size:13px;font-weight:800;margin-top:10px;}
   .list-card.clickable{cursor:pointer;}
+  .card-actions{display:flex;gap:8px;}
+  .card-actions button{flex:1;margin-top:10px;white-space:nowrap;padding:9px 8px;font-size:12.5px;}
+  .list-card .btn-spec{background:#eef1f8;color:var(--navy);}
+  .list-card .btn-spec:disabled{opacity:0.6;}
+  .list-card .btn-changes{background:#fff1f1;color:#b3261e;}
 
   .badge{display:inline-block;padding:3px 9px;border-radius:20px;font-size:11px;font-weight:800;margin-left:8px;}
   .badge.r1{background:#dceafd;color:var(--blue);}
@@ -85,6 +101,8 @@
   .add-custom button{width:100%;background:none;border:1.5px dashed var(--border);border-radius:8px;padding:10px;color:var(--navy);font-weight:800;font-size:13px;}
   .custom-item-input{display:none;padding-top:10px;}
   .custom-item-input.show{display:block;}
+  .add-bedroom-card{border:1.5px dashed #9fb0d9;border-radius:12px;margin-bottom:14px;padding:12px 14px;background:#f6f8ff;}
+  .add-bedroom-card button{width:100%;background:var(--navy);color:#fff;border:none;border-radius:8px;padding:11px;font-size:13.5px;font-weight:800;}
   .progress-bar{position:sticky;bottom:0;background:#fff;border-top:1px solid var(--border);padding:12px 16px;display:flex;align-items:center;gap:12px;}
   .progress-bar .stats{font-size:12.5px;color:var(--gray);flex:1;}
   .progress-bar .stats b{color:var(--dark);}
@@ -107,8 +125,33 @@
   .chip{display:inline-block;background:#eef1f8;color:var(--navy);font-size:11.5px;font-weight:800;padding:4px 10px;border-radius:20px;margin-bottom:10px;}
 
   .chip-row{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;}
-  .filter-chip{background:#eef1f8;color:var(--navy);border:1.5px solid transparent;font-size:12px;font-weight:800;padding:6px 12px;border-radius:20px;}
+  .filter-chip{display:inline-flex;align-items:center;gap:7px;background:#eef1f8;color:var(--navy);border:1.5px solid transparent;font-size:12px;font-weight:800;padding:6px 8px 6px 12px;border-radius:20px;}
   .filter-chip.sel{background:var(--navy);color:#fff;}
+  .chip-count{display:inline-flex;align-items:center;justify-content:center;min-width:19px;height:19px;padding:0 5px;border-radius:10px;background:rgba(26,43,76,0.1);color:inherit;font-size:10.5px;font-weight:800;}
+  .filter-chip.sel .chip-count{background:rgba(255,255,255,0.28);}
+  .apt-hero{width:100%;height:130px;border-radius:12px;overflow:hidden;margin-bottom:14px;background:#eef1f8;}
+  .apt-hero img{width:100%;height:100%;object-fit:cover;display:block;}
+  .tech-changes-box{background:#fff4f4;border:1.5px solid #ffcdd2;color:#b3261e;border-radius:10px;padding:12px 14px;font-size:13px;font-weight:700;margin:0 0 16px;line-height:1.5;}
+  .tech-changes-box .changes-text{font-weight:500;margin-top:6px;color:#7a1c17;}
+  .changes-list{margin:0;padding-left:20px;}
+  .changes-list li{margin-bottom:6px;}
+  .changes-list li:last-child{margin-bottom:0;}
+
+  /* In-app file preview modal (Apt Plan / Technical Specification) */
+  .file-preview-modal{display:none;position:fixed;inset:0;background:rgba(16,20,34,0.72);z-index:100;flex-direction:column;}
+  .file-preview-topbar{display:flex;align-items:center;gap:10px;padding:12px 16px;background:var(--navy-dark);color:#fff;flex-shrink:0;}
+  .file-preview-title{flex:1;font-size:14px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .file-preview-close{background:rgba(255,255,255,0.12);color:#fff;border:none;border-radius:8px;width:34px;height:34px;font-size:18px;font-weight:800;flex-shrink:0;}
+  .file-preview-body{flex:1;background:#fff;display:flex;min-height:0;}
+  .file-preview-frame{width:100%;height:100%;border:none;flex:1;}
+  .file-preview-img{width:100%;height:100%;object-fit:contain;margin:auto;}
+  .file-preview-text{flex:1;overflow-y:auto;padding:24px 20px;font-size:15px;line-height:1.65;color:var(--dark);}
+
+  /* Contractor signature pad (final sign-off) */
+  .signature-pad-wrap{border:1.5px solid var(--border);border-radius:10px;background:#fbfbfc;margin-top:6px;overflow:hidden;}
+  .signature-pad-canvas{width:100%;height:140px;display:block;touch-action:none;}
+  .signature-pad-actions{display:flex;justify-content:space-between;align-items:center;padding:6px 2px 0;font-size:12px;color:var(--gray);}
+  .signature-clear-btn{background:none;border:none;color:var(--navy);font-weight:800;font-size:12.5px;padding:4px 6px;}
   .status-pill{display:inline-block;padding:3px 9px;border-radius:20px;font-size:10.5px;font-weight:800;vertical-align:middle;margin-left:6px;white-space:nowrap;}
   .st-new{background:#eef1f8;color:var(--gray);}
   .st-not-completed{background:#fff1de;color:var(--orange);}
@@ -121,6 +164,19 @@
   .sync-panel{display:none;background:var(--navy-dark);padding:0 16px 12px;}
   .sync-job-row{padding:8px 0;border-top:1px solid rgba(255,255,255,0.12);font-size:12.5px;}
   .sync-job-row .sub{color:rgba(255,255,255,0.7)!important;}
+  .sync-job-row-top{display:flex;justify-content:space-between;align-items:center;gap:8px;}
+  .sync-cancel-btn{background:none;border:1.3px solid rgba(226,68,92,0.7);color:#ff9caa;border-radius:6px;padding:4px 9px;font-size:11px;font-weight:800;white-space:nowrap;}
+
+  .list-card.card-st-new{border-left:5px solid var(--gray);}
+  .list-card.card-st-not-completed{border-left:5px solid var(--orange);background:#fffaf2;}
+  .list-card.card-st-approved{border-left:5px solid var(--green);background:#f1fdf7;}
+
+  .stage-banner{border-radius:12px;padding:14px 16px;font-size:14.5px;font-weight:700;text-align:center;margin:2px 0 20px;line-height:1.45;}
+  .stage-banner b{font-weight:800;}
+  .stage-banner.stage-new{background:#eef1f8;color:var(--navy);border:1.5px solid #c9d2ea;}
+  .stage-banner.stage-r2{background:#fff1de;color:#a15b00;border:1.5px solid #ffdca6;}
+
+  .plan-btn{display:block;width:100%;background:#eef1f8;color:var(--navy);border:1.5px solid var(--border);border-radius:10px;padding:12px;font-size:14px;font-weight:800;margin-top:14px;text-align:center;}
 </style>
 </head>
 <body>
@@ -141,8 +197,8 @@
     <div class="brand-header">
       <div class="brand-row">
         <div class="brand-logo" id="logo-slot-setup"></div>
-        <div class="brand-text"><div class="app-sub">Apartment Delivery Protocol</div></div>
       </div>
+      <div class="app-sub">Apartment Delivery Protocol</div>
     </div>
     <div class="screen-pad">
       <h1>Tablet Setup</h1>
@@ -160,8 +216,8 @@
     <div class="brand-header">
       <div class="brand-row">
         <div class="brand-logo" id="logo-slot-lock"></div>
-        <div class="brand-text"><div class="app-sub">Apartment Delivery Protocol</div></div>
       </div>
+      <div class="app-sub">Apartment Delivery Protocol</div>
     </div>
     <div class="center-box">
       <div class="icon">🔒</div>
@@ -178,9 +234,9 @@
     <div class="brand-header">
       <div class="brand-row">
         <div class="brand-logo" id="logo-slot-proj"></div>
-        <div class="brand-text"><div class="app-sub">Apartment Delivery Protocol</div></div>
         <button class="lock-icon" onclick="lockApp()">🔒</button>
       </div>
+      <div class="app-sub">Apartment Delivery Protocol</div>
     </div>
     <div class="screen-pad">
       <span class="chip">ON GOING PROJECTS</span>
@@ -189,6 +245,7 @@
       <input type="text" id="proj-search" class="search-box" placeholder="Type project name..." oninput="renderProjectList()">
       <div id="proj-loading" class="spinner" style="margin-top:30px;"></div>
       <div id="proj-list"></div>
+      <p class="footer-note" id="app-version-note"></p>
     </div>
   </div>
 
@@ -199,9 +256,9 @@
       <div class="title" id="apt-picker-title">Select Apartment</div>
     </div>
     <div class="screen-pad">
+      <div id="apt-hero" class="apt-hero" style="display:none;"><img id="apt-hero-img" alt=""></div>
       <label>Search Apartment</label>
       <input type="text" id="apt-search" class="search-box" placeholder="Type apartment name..." oninput="renderApartmentList()">
-      <div id="apt-stats" class="sub" style="margin-bottom:8px;"></div>
       <div id="apt-filter-chips" class="chip-row"></div>
       <div id="apt-empty-note" class="sub" style="display:none;">No apartments found for this project in the Apartments Database.</div>
       <div id="apt-list"></div>
@@ -224,6 +281,10 @@
     </div>
     <div class="screen-pad">
       <div id="header-round-note" class="sub"></div>
+      <div id="techspec-changes-box" class="tech-changes-box" style="display:none;">
+        ⚠️ <b>Technical Specification Changes</b>
+        <div class="changes-text"></div>
+      </div>
       <label>Apartment</label>
       <input type="text" id="hdr-apartment" disabled>
       <label>Project</label>
@@ -232,8 +293,10 @@
       <input type="text" id="hdr-contractor" disabled>
       <label>Inspection Date</label>
       <input type="date" id="hdr-date">
-      <label>Supervisor / Inspector Name</label>
-      <input type="text" id="hdr-supervisor" placeholder="Full name">
+      <label>Supervisor / Inspector</label>
+      <select id="hdr-supervisor">
+        <option value="">-- Select from VESTA team --</option>
+      </select>
       <div id="hdr-error" class="error-text"></div>
       <button class="btn btn-primary" onclick="startChecklist()">Start Checklist</button>
     </div>
@@ -270,10 +333,20 @@
         <h2 style="margin-top:0;">Final Sign-Off</h2>
         <p class="sub">All items are Approved or Not Relevant. Both parties sign off below.</p>
         <label>Supervisor Name</label>
-        <input type="text" id="sign-supervisor" placeholder="Full name">
+        <select id="sign-supervisor">
+          <option value="">-- Select from VESTA team --</option>
+        </select>
         <div class="checkbox-row"><input type="checkbox" id="sign-supervisor-confirm"><label for="sign-supervisor-confirm">Supervisor confirms this apartment is fully approved</label></div>
         <label style="margin-top:20px;">Contractor Name</label>
         <input type="text" id="sign-contractor" placeholder="Full name">
+        <label style="margin-top:12px;">Contractor Signature</label>
+        <div class="signature-pad-wrap">
+          <canvas id="contractor-sig-canvas" class="signature-pad-canvas"></canvas>
+        </div>
+        <div class="signature-pad-actions">
+          <span>Sign above with your finger or stylus</span>
+          <button type="button" class="signature-clear-btn" onclick="clearContractorSignature()">Clear</button>
+        </div>
         <div class="checkbox-row"><input type="checkbox" id="sign-contractor-confirm"><label for="sign-contractor-confirm">Contractor confirms this apartment is fully approved</label></div>
       </div>
 
@@ -298,6 +371,15 @@
 
 </div>
 
+<!-- IN-APP FILE PREVIEW (Apt Plan / Technical Specification) -->
+<div id="file-preview-modal" class="file-preview-modal">
+  <div class="file-preview-topbar">
+    <div class="file-preview-title" id="file-preview-title">Preview</div>
+    <button type="button" class="file-preview-close" onclick="closeFilePreview()">✕</button>
+  </div>
+  <div class="file-preview-body" id="file-preview-body"></div>
+</div>
+
 <script>
 /* ============ LOGO ============ */
 /* Replace this with a data:image/png;base64,... URI once the VESTA logo is supplied, and it will
@@ -314,6 +396,30 @@ const BOARD_INSPECTIONS = 5103057296;
 const BOARD_SUBITEMS = 5103057881;
 const BOARD_APARTMENTS = 1667372413;
 const BOARD_PROJECTS = 1667314838;
+const BOARD_GTM = 1667383438; // "GO TO MARKET" board — used to pull an Exterior Render image per project
+const COL_GTM = {
+  project: "connect_boards__1",
+  exteriorRender: "file__1"
+};
+// Extra file/mirror columns on APARTMENTS DATABASE, mirrored into the header screen
+const APT_COL = {
+  aptPlan: "files__1",
+  techSpec: "files_mkkyrchf",
+  techSpecChanges: "lookup_mkqw3krm"
+};
+const PROJECT_COL = {
+  contractor: "connect_boards2__1" // "Contractor" board_relation column on PROJECTS, links to SUPPLIERS
+};
+const APP_VERSION = "2026-08-28.10";
+// Members of the "VESTA" team on Monday, used to populate the Supervisor/Inspector pickers.
+// Kept as a plain static list rather than fetched live from Monday's teams/users API — that API
+// call came back empty for this app's token (likely a permission/scope restriction on reading
+// account users), so a fixed list sidesteps the problem entirely. Update this array by hand if
+// the VESTA team's membership changes.
+const VESTA_TEAM = [
+  "Aggeliki Dalivigka","Aliki","Epaminondas","Evgenia Dima","Katerina Symeon",
+  "Mado Demiri","Marios Simopoulos","Niki Ladikou","Sofia Salamoura","Tomer Gelles"
+];
 const PROJECTS_ONGOING_GROUP = "topics"; // "ON GOING" group on the PROJECTS board
 // NOTE: the "Project" board_relation column on APARTMENTS DATABASE (connect_boards__1) is not
 // populated on any existing item, so apartments are matched to their project by name instead
@@ -335,7 +441,8 @@ const COL = {
   contractorConfirm: "boolean_mm6mf135",
   contractorSignDate: "date_mm6mecjy",
   notes: "long_text_mm6mnyt1",
-  contractorMirror: "lookup_mm6marq8"
+  contractorMirror: "lookup_mm6marq8",
+  reportPdf: "file_mm6ngw1r"
 };
 const SUBCOL = {
   status: "status",
@@ -348,7 +455,11 @@ const STATUS_LABELS = {
   round1Submitted: "Round 1 Submitted",
   round2Approved: "Round 2 Approved",
   round1InProgress: "Round 1 In Progress",
-  round2InProgress: "Round 2 In Progress"
+  round2InProgress: "Round 2 In Progress",
+  // Set once the signed-off PDF report has actually been generated and attached (see
+  // generateAndUploadReport) — the board's true "fully done" state, distinct from "Round 2
+  // Approved" which only means the sign-off itself was recorded.
+  finalReportSent: "Final Report Sent"
 };
 
 /* ============ CHECKLIST DATA (matches Monday template item exactly) ============ */
@@ -364,10 +475,15 @@ const CHECKLIST = [
 {s:"9. Bathroom", items:["Safety socket installed and working","All lights are working","Spout is working","Toilet flush is working","Shower accessories are installed and function properly","Shower functions well and collects water properly","Washing machine working properly / preparation installed","Furniture for boiler and washing machine functions well and closes precisely","Boiler's access point in gypsum ceiling is working properly (if applicable)","Boiler is working and producing hot water.","Floor and wall tiles are installed correctly","Drainage is installed correctly","Silicon is placed on all corners of the counter","Check for mold or moisture in corners and near drainage","Ensure mirrors and glass surfaces are installed and intact","Water cannot pass through the glass separation","Bathroom set is installed (towel hanger, paper holder)"]},
 {s:"10. Living Room", items:["All lights are working","All sockets are installed and function properly","Preparation for TV and internet is installed","Test internet connection points (if possible)"]},
 {s:"11. Bedroom 1", items:["All lights are working","Closet functions well and closes precisely (check all)","Hanger is placed","Minimum of 5 sockets in the room","Side bed sockets","Preparation for TV is installed"]},
-{s:"12. Bedroom 2", items:["All lights are working","Closet functions well and closes precisely (check all)","Hanger is placed","Minimum of 5 sockets in the room","Side bed sockets / Bluetooth tested (if applicable)","Preparation for TV is installed"]},
 {s:"13. Balcony", items:["Water hose is working","Outdoor socket is working","The drainage of water is clean","Rails and walls are painted","Floor is polished","Shade is in perfect condition, installed, and works properly (if applicable)","Outdoor lights are working","Inspect railing for stability and safety"]},
 {s:"14. Cleaning", items:["Floors, cupboards, kitchen, shower (construction clean)","All window frames and doors are clean from plastic protection","Remove all debris from construction or renovation work","All keys are handed (construction key + full set)"]}
 ];
+// Only "Bedroom 1" is on the standard checklist by default, since not every apartment has more
+// than one bedroom. If it does, the inspector taps "+ Add Bedroom 2" (and then "+ Add Bedroom 3")
+// on the Round 1 checklist screen, which clones Bedroom 1's item list under a new section label —
+// see addBedroomSection(). Capped at 3 bedrooms total; extend this list if a bigger apartment ever
+// needs a 4th.
+const EXTRA_BEDROOM_LABELS = ["Bedroom 2", "Bedroom 3"];
 
 /* ============ STATE ============ */
 let apartments = []; // {id, name, projectKey}
@@ -380,10 +496,17 @@ let formItems = [];
 let aptStatusMap = new Map(); // apartmentId(string) -> {statusText, inspectionItemId}
 let aptStatusFilter = 'all'; // 'all' | 'st-new' | 'st-not-completed' | 'st-approved'
 let aptStatusLoaded = false; // guards selectApartment against acting before the status fetch completes
+let aptChangesMap = new Map(); // apartmentId(string) -> Technical Specification Changes text (only non-empty entries)
+let currentAptDetails = null; // {planUrl, techSpecUrl, techSpecChanges} for the apartment on screen-header
+let currentContractorName = ''; // name of the Contractor linked to the current project, auto-filled into the header/sign-off
+let contractorLoadPromise = null;
 
 /* ============ STORAGE / SETUP ============ */
 function loadConfig(){
   applyLogo();
+  populateSupervisorSelects();
+  const verEl = document.getElementById('app-version-note');
+  if(verEl) verEl.textContent = 'App version ' + APP_VERSION;
   const pin = localStorage.getItem('adi_pin');
   if(!pin){ showScreen('screen-setup'); }
   else { showScreen('screen-lock'); }
@@ -423,8 +546,38 @@ function toast(msg){
 }
 
 /* ============ MONDAY API HELPERS ============ */
+// Plain fetch() never times out on its own — on a weak/dropping on-site WiFi connection (the
+// exact environment this app is used in) a request can just hang forever with no error and no
+// retry, which is what "stuck on submitting" turned out to be for photo uploads. Every network
+// call here goes through this wrapper so a stalled request eventually aborts and throws instead,
+// letting the existing job retry/backoff machinery (see processJob/scheduleRetry) take over.
+async function fetchWithTimeout(url, options, timeoutMs){
+  const controller = new AbortController();
+  const timer = setTimeout(()=>controller.abort(), timeoutMs);
+  try{
+    return await fetch(url, {...options, signal: controller.signal});
+  }catch(e){
+    if(e.name === 'AbortError'){
+      throw new Error(`Network request timed out after ${Math.round(timeoutMs/1000)}s — check your connection`);
+    }
+    throw e;
+  }finally{
+    clearTimeout(timer);
+  }
+}
+// Reads the response body as text first rather than calling res.json() directly, so a non-JSON
+// error page (a Cloudflare relay error, a Monday 5xx HTML page, etc.) surfaces as a clear message
+// with the actual HTTP status instead of a cryptic "Unexpected token '<'" JSON parse error.
+async function parseJsonResponse(res){
+  const text = await res.text();
+  try{
+    return JSON.parse(text);
+  }catch(e){
+    throw new Error(`Unexpected response (HTTP ${res.status}): ${(text||'').slice(0,200) || 'empty body'}`);
+  }
+}
 async function mondayApi(query, variables){
-  const res = await fetch('https://api.monday.com/v2', {
+  const res = await fetchWithTimeout('https://api.monday.com/v2', {
     method:'POST',
     headers:{
       'Content-Type':'application/json',
@@ -432,8 +585,8 @@ async function mondayApi(query, variables){
       'API-Version':'2023-10'
     },
     body: JSON.stringify({query, variables})
-  });
-  const json = await res.json();
+  }, 20000);
+  const json = await parseJsonResponse(res);
   if(json.errors){
     throw new Error(json.errors.map(e=>e.message).join('; '));
   }
@@ -449,12 +602,14 @@ async function mondayFileUpload(query, itemId, columnId, file){
   form.append('variables[item_id]', itemId);
   form.append('variables[column_id]', columnId);
   form.append('variables[file]', file, file.name || 'photo.jpg');
-  const res = await fetch(MONDAY_FILE_RELAY, {
+  // Photo uploads get a longer timeout than plain API calls — they carry real file bytes over
+  // what may be a slow on-site connection, so they legitimately take longer than a JSON request.
+  const res = await fetchWithTimeout(MONDAY_FILE_RELAY, {
     method:'POST',
     headers:{ 'Authorization': MONDAY_TOKEN },
     body: form
-  });
-  const json = await res.json();
+  }, 60000);
+  const json = await parseJsonResponse(res);
   if(json.errors){ throw new Error(json.errors.map(e=>e.message).join('; ')); }
   return json.data;
 }
@@ -473,6 +628,14 @@ async function enterProjects(){
   }
   document.getElementById('proj-loading').style.display='none';
   renderProjectList();
+}
+function populateSupervisorSelects(){
+  const opts = '<option value="">-- Select from VESTA team --</option>' +
+    VESTA_TEAM.map(name=>`<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`).join('');
+  const hdrSel = document.getElementById('hdr-supervisor');
+  const signSel = document.getElementById('sign-supervisor');
+  if(hdrSel) hdrSel.innerHTML = opts;
+  if(signSel) signSel.innerHTML = opts;
 }
 async function fetchOngoingProjects(){
   const q = `query{
@@ -506,15 +669,128 @@ async function selectProject(projId){
   aptStatusFilter = 'all';
   aptStatusMap = new Map();
   aptStatusLoaded = false;
+  aptChangesMap = new Map();
+  currentContractorName = '';
   showScreen('screen-apartments');
   renderAptFilterChips();
   renderApartmentList();
+  loadApartmentHeroImage(currentProject.id);
+  loadAptChangesMap();
+  contractorLoadPromise = loadProjectContractor(currentProject.id);
   await refreshAptStatusesAndRender();
+}
+// Fetches the Contractor linked to this project (PROJECTS -> Contractor board_relation ->
+// SUPPLIERS item name) so it can be auto-filled instead of typed, on the header screen and again
+// at final sign-off. Supplementary only — leaves currentContractorName blank on failure.
+async function loadProjectContractor(projectId){
+  try{
+    currentContractorName = await fetchProjectContractorName(projectId);
+  }catch(e){
+    currentContractorName = '';
+  }
+}
+async function fetchProjectContractorName(projectId){
+  const q = `query($ids:[ID!]){
+    items(ids:$ids){
+      column_values(ids:["${PROJECT_COL.contractor}"]){
+        id
+        ... on BoardRelationValue { display_value }
+      }
+    }
+  }`;
+  const data = await mondayApi(q, {ids:[projectId]});
+  const col = (data.items[0] && data.items[0].column_values[0]) || null;
+  return (col && col.display_value) ? col.display_value.trim() : '';
+}
+// Fetches "Technical Specification Changes" for every apartment in the current project so the
+// "Changes" button can be shown ONLY on apartments that actually have something noted — instead
+// of showing it everywhere and telling the user "nothing here" after they tap it.
+async function loadAptChangesMap(){
+  if(!currentProject) return;
+  const inProject = apartments.filter(a => a.projectKey === currentProject.key);
+  const ids = inProject.map(a=>a.id);
+  const projectAtStart = currentProject.id;
+  try{
+    aptChangesMap = await fetchAptChangesMap(ids);
+  }catch(e){
+    // Supplementary data only — on failure the Changes button simply stays hidden for everyone.
+  }
+  if(currentProject && currentProject.id === projectAtStart){
+    renderApartmentList();
+  }
+}
+async function fetchAptChangesMap(aptIds){
+  const map = new Map();
+  if(!aptIds.length) return map;
+  // Monday's items() root query is reliable up to ~100 ids at a time — chunk defensively in case
+  // a project ever has more apartments than that.
+  const CHUNK = 80;
+  for(let i=0; i<aptIds.length; i+=CHUNK){
+    const chunk = aptIds.slice(i, i+CHUNK);
+    const q = `query($ids:[ID!]){
+      items(ids:$ids){
+        id
+        column_values(ids:["${APT_COL.techSpecChanges}"]){
+          id
+          ... on MirrorValue { display_value }
+        }
+      }
+    }`;
+    const data = await mondayApi(q, {ids: chunk});
+    (data.items||[]).forEach(it=>{
+      const col = it.column_values[0];
+      const text = (col && col.display_value) ? col.display_value.trim() : '';
+      if(text) map.set(String(it.id), text);
+    });
+  }
+  return map;
+}
+async function loadApartmentHeroImage(projectId){
+  // Purely decorative — pulls the "Exterior Render" image for this project from the GO TO MARKET
+  // board so the apartment picker feels less like a bare list. Fails silently since it's non-critical.
+  const hero = document.getElementById('apt-hero');
+  const heroImg = document.getElementById('apt-hero-img');
+  if(!hero || !heroImg) return;
+  hero.style.display = 'none';
+  try{
+    const url = await fetchExteriorRenderUrl(projectId);
+    if(url && currentProject && String(currentProject.id)===String(projectId)){
+      heroImg.src = url;
+      hero.style.display = 'block';
+    }
+  }catch(e){ /* decorative only — ignore failures */ }
+}
+async function fetchExteriorRenderUrl(projectId){
+  const q = `query{
+    boards(ids:[${BOARD_GTM}]){
+      items_page(limit:100){
+        items{
+          id
+          column_values(ids:["${COL_GTM.project}","${COL_GTM.exteriorRender}"]){
+            id
+            ... on BoardRelationValue { linked_item_ids }
+            ... on FileValue { files { ... on FileAssetValue { name asset { public_url } } } }
+          }
+        }
+      }
+    }
+  }`;
+  const data = await mondayApi(q);
+  const items = data.boards[0].items_page.items;
+  const targetId = String(projectId);
+  for(const it of items){
+    const projCol = it.column_values.find(c=>c.id===COL_GTM.project);
+    const linkedId = extractLinkedId(projCol);
+    if(linkedId!==null && String(linkedId)===targetId){
+      const fileCol = it.column_values.find(c=>c.id===COL_GTM.exteriorRender);
+      if(fileCol && fileCol.files && fileCol.files.length) return fileCol.files[0].asset.public_url;
+      return null;
+    }
+  }
+  return null;
 }
 async function refreshAptStatusesAndRender(){
   if(!currentProject) return;
-  const statsEl = document.getElementById('apt-stats');
-  if(statsEl && aptStatusMap.size===0) statsEl.textContent = 'Checking inspection status…';
   try{
     aptStatusMap = await fetchProjectInspectionStatuses(currentProject.id);
   }catch(e){
@@ -582,19 +858,22 @@ function statusBadgeFor(aptId){
   if(job) return {label:'⏳ Syncing…', cls:'st-not-completed'};
   const rec = aptStatusMap.get(String(aptId));
   if(!rec || !rec.statusText) return {label:'New', cls:'st-new'};
-  if(rec.statusText === STATUS_LABELS.round2Approved) return {label:'✓ Approved', cls:'st-approved'};
+  if(rec.statusText === STATUS_LABELS.round2Approved || rec.statusText === STATUS_LABELS.finalReportSent) return {label:'✓ Approved', cls:'st-approved'};
   return {label:'Not Completed - 2nd Inspection', cls:'st-not-completed'};
 }
 function renderAptFilterChips(){
   const wrap = document.getElementById('apt-filter-chips');
-  if(!wrap) return;
+  if(!wrap || !currentProject) return;
+  const inProject = apartments.filter(a => a.projectKey === currentProject.key);
+  const counts = {'st-new':0,'st-not-completed':0,'st-approved':0};
+  inProject.forEach(a=>{ const b = statusBadgeFor(a.id); counts[b.cls] = (counts[b.cls]||0)+1; });
   const options = [
-    {key:'all', label:'All'},
-    {key:'st-new', label:'New'},
-    {key:'st-not-completed', label:'Not Completed - 2nd Inspection'},
-    {key:'st-approved', label:'Approved'}
+    {key:'all', label:'All', count: inProject.length},
+    {key:'st-new', label:'New', count: counts['st-new']},
+    {key:'st-not-completed', label:'Not Completed - 2nd Inspection', count: counts['st-not-completed']},
+    {key:'st-approved', label:'Approved', count: counts['st-approved']}
   ];
-  wrap.innerHTML = options.map(o=>`<button type="button" class="filter-chip ${aptStatusFilter===o.key?'sel':''}" onclick="setAptFilter('${o.key}')">${o.label}</button>`).join('');
+  wrap.innerHTML = options.map(o=>`<button type="button" class="filter-chip ${aptStatusFilter===o.key?'sel':''}" onclick="setAptFilter('${o.key}')">${o.label}<span class="chip-count">${o.count}</span></button>`).join('');
 }
 function setAptFilter(key){ aptStatusFilter = key; renderAptFilterChips(); renderApartmentList(); }
 
@@ -631,14 +910,10 @@ function renderApartmentList(){
   let inProject = apartments.filter(a => a.projectKey === currentProject.key);
   document.getElementById('apt-empty-note').style.display = inProject.length===0 ? 'block' : 'none';
 
-  const statsEl = document.getElementById('apt-stats');
-  if(statsEl && inProject.length){
-    const counts = {'st-new':0,'st-not-completed':0,'st-approved':0};
-    inProject.forEach(a=>{ const b = statusBadgeFor(a.id); counts[b.cls] = (counts[b.cls]||0)+1; });
-    statsEl.textContent = `${counts['st-approved']} approved · ${counts['st-not-completed']} not completed - 2nd inspection · ${counts['st-new']} new · ${inProject.length} total`;
-  } else if(statsEl){
-    statsEl.textContent = '';
-  }
+  // Per-status counts now live as badges on the filter chips themselves (like an inbox unread
+  // count) instead of a separate stats line — refresh them here so they stay in sync as jobs
+  // complete or the status map loads in.
+  renderAptFilterChips();
 
   let filtered = term ? inProject.filter(a=>a.name.toLowerCase().includes(term)) : inProject;
   if(aptStatusFilter !== 'all'){
@@ -648,15 +923,40 @@ function renderApartmentList(){
   if(filtered.length===0 && inProject.length>0){ list.innerHTML = '<p class="sub">No matches.</p>'; return; }
   list.innerHTML = filtered.map(a => {
     const b = statusBadgeFor(a.id);
+    // "Changes" only shows up once we know (from aptChangesMap) that this apartment actually has
+    // Technical Specification Changes noted — never shown just to say "there's nothing here".
+    const hasChanges = aptChangesMap.has(String(a.id));
     return `
-    <div class="list-card">
+    <div class="list-card card-${b.cls}">
       <div class="name">${escapeHtml(a.name)}<span class="status-pill ${b.cls}">${b.label}</span></div>
       <div class="meta">${escapeHtml(currentProject.name)}</div>
-      <button onclick="selectApartment('${a.id}')">Select</button>
+      <div class="card-actions">
+        <button onclick="selectApartment('${a.id}')">Select</button>
+        <button type="button" class="btn-spec" onclick="openAptPlanFromList('${a.id}', this)">📐 Plan</button>
+        <button type="button" class="btn-spec" onclick="openTechSpecFromList('${a.id}', this)">📄 Spec</button>
+        ${hasChanges ? `<button type="button" class="btn-spec btn-changes" onclick="openTechSpecChangesFromList('${a.id}')">📝 Changes</button>` : ''}
+      </div>
     </div>
   `;}).join('');
 }
 function escapeHtml(s){ return (s||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+// Renders free-text "Technical Specification Changes" content as a bullet list instead of one
+// dense paragraph, since it's usually a set of separate change notes. Splits on newlines (each
+// mirror line is treated as one bullet); if the text has no line breaks at all, falls back to
+// splitting on ". " so a single run-on sentence still becomes readable bullets. Strips any
+// leading "-", "*", "•", or "1." the source text already has, so bullets aren't doubled up.
+function formatChangesAsBullets(text){
+  if(!text) return '';
+  let lines = text.split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
+  if(lines.length <= 1){
+    lines = text.split(/(?<=[.;])\s+(?=\S)/).map(l=>l.trim()).filter(Boolean);
+  }
+  if(lines.length <= 1){
+    return escapeHtml(text).replace(/\n/g,'<br>');
+  }
+  const items = lines.map(l=>l.replace(/^[-*•]\s*/, '').replace(/^\d+[.)]\s*/, ''));
+  return `<ul class="changes-list">${items.map(l=>`<li>${escapeHtml(l)}</li>`).join('')}</ul>`;
+}
 
 /* ============ SELECT APARTMENT -> CHECK EXISTING RECORD ============ */
 async function selectApartment(aptId){
@@ -670,6 +970,11 @@ async function selectApartment(aptId){
     return;
   }
   currentApartment = apartments.find(a=>a.id===aptId);
+  currentAptDetails = null;
+  renderAptExtras();
+  fetchApartmentDetails(aptId).then(d=>{
+    if(currentApartment && currentApartment.id===aptId){ currentAptDetails = d; renderAptExtras(); }
+  }).catch(()=>{ /* Apt Plan / Technical Specification are supplementary — ignore failures */ });
   showScreen('screen-checking');
   try{
     // Reuses the status already fetched for the whole project (see fetchProjectInspectionStatuses)
@@ -681,7 +986,7 @@ async function selectApartment(aptId){
       currentRound = 1;
       formItems = buildFreshFormItems();
       openHeaderScreen();
-    } else if(rec.statusText === STATUS_LABELS.round2Approved){
+    } else if(rec.statusText === STATUS_LABELS.round2Approved || rec.statusText === STATUS_LABELS.finalReportSent){
       toast('This apartment is already fully approved and signed.');
       showScreen('screen-apartments');
     } else {
@@ -741,20 +1046,178 @@ function getColText(item, colId){
 /* ============ HEADER SCREEN ============ */
 function openHeaderScreen(){
   document.getElementById('header-title').textContent = currentRound===1 ? 'Round 1 - New Inspection' : 'Round 2 - Re-Inspection';
-  document.getElementById('header-round-note').textContent = currentRound===1
-    ? 'This will create a new inspection record for this apartment.'
-    : 'This apartment has an open inspection. Only the items still marked "Not Approved" will be shown below.';
+  const roundNote = document.getElementById('header-round-note');
+  roundNote.className = 'stage-banner ' + (currentRound===1 ? 'stage-new' : 'stage-r2');
+  roundNote.innerHTML = currentRound===1
+    ? '🆕 <b>New Inspection</b><br>This will create a new inspection record for this apartment.'
+    : '🔁 <b>2nd Inspection — Not Completed Items</b><br>This apartment has an open inspection. Only items still marked "Not Approved" are shown below.';
   document.getElementById('hdr-apartment').value = currentApartment.name;
   document.getElementById('hdr-project').value = currentProject.name;
-  document.getElementById('hdr-contractor').value = 'Auto-filled from Project';
+  document.getElementById('hdr-contractor').value = currentContractorName || 'Loading…';
+  if(contractorLoadPromise){
+    contractorLoadPromise.then(()=>{
+      // Only overwrite if this is still the same apartment's header screen
+      if(currentApartment) document.getElementById('hdr-contractor').value = currentContractorName || 'No contractor linked to this project';
+    });
+  }
   document.getElementById('hdr-date').value = new Date().toISOString().slice(0,10);
   document.getElementById('hdr-supervisor').value = '';
   document.getElementById('hdr-error').textContent = '';
+  renderAptExtras();
   showScreen('screen-header');
+}
+// Fetches the "Technical Specification Changes" mirror text from the APARTMENTS DATABASE board
+// for one apartment, shown as an alert box on the header screen. Uses the typed MirrorValue
+// fragment (the generic column_values{text value} field doesn't populate reliably for this column
+// type) — same technique proven for the board_relation status fix. (Apt Plan and Technical
+// Specification are both fetched separately and lazily — see fetchApartmentFile — since they're
+// previewed straight from the apartment list via their own buttons rather than the header screen.)
+async function fetchApartmentDetails(aptId){
+  const q = `query($ids:[ID!]){
+    items(ids:$ids){
+      column_values(ids:["${APT_COL.techSpecChanges}"]){
+        id
+        ... on MirrorValue { display_value }
+      }
+    }
+  }`;
+  const data = await mondayApi(q, {ids:[aptId]});
+  const cols = (data.items[0] && data.items[0].column_values) || [];
+  const changesCol = cols.find(c=>c.id===APT_COL.techSpecChanges);
+  return {
+    techSpecChanges: (changesCol && changesCol.display_value) ? changesCol.display_value.trim() : ''
+  };
+}
+// Fetches a single file-type column for one apartment on demand (used for the "Plan"/"Spec"
+// buttons on the apartment list, so we don't have to pull file columns for every apartment up front).
+async function fetchApartmentFile(aptId, colId){
+  const q = `query($ids:[ID!]){
+    items(ids:$ids){
+      column_values(ids:["${colId}"]){
+        id
+        ... on FileValue { files { ... on FileAssetValue { name asset { public_url } } } }
+      }
+    }
+  }`;
+  const data = await mondayApi(q, {ids:[aptId]});
+  const col = (data.items[0] && data.items[0].column_values[0]) || null;
+  if(col && col.files && col.files.length){
+    return { url: col.files[0].asset.public_url, name: col.files[0].name };
+  }
+  return null;
+}
+// Shows/hides the "Technical Specification Changes" alert on the header screen. Safe to call
+// before the fetch above resolves (it just stays hidden) and again once it does.
+function renderAptExtras(){
+  const changesBox = document.getElementById('techspec-changes-box');
+  if(!changesBox) return;
+  if(currentAptDetails && currentAptDetails.techSpecChanges){
+    changesBox.style.display = 'block';
+    const holder = changesBox.querySelector('.changes-text');
+    holder.innerHTML = formatChangesAsBullets(currentAptDetails.techSpecChanges);
+  } else {
+    changesBox.style.display = 'none';
+  }
+}
+// Called from the "Plan" button on each apartment list card. Fetches the Apt Plan file for that
+// one apartment and opens it in the in-app preview modal instead of downloading it.
+async function openAptPlanFromList(aptId, btn){
+  const original = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = '…';
+  try{
+    const file = await fetchApartmentFile(aptId, APT_COL.aptPlan);
+    if(!file){
+      toast('No Apt Plan uploaded for this apartment yet.');
+    } else {
+      openFilePreview(file.url, file.name);
+    }
+  }catch(e){
+    toast('Could not load Apt Plan: '+e.message);
+  }finally{
+    btn.disabled = false;
+    btn.textContent = original;
+  }
+}
+// Called from the "Spec" button on each apartment list card. Fetches the Technical Specification
+// file for that one apartment and opens it in the in-app preview modal instead of downloading it.
+async function openTechSpecFromList(aptId, btn){
+  const original = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = '…';
+  try{
+    const file = await fetchApartmentFile(aptId, APT_COL.techSpec);
+    if(!file){
+      toast('No Technical Specification uploaded for this apartment yet.');
+    } else {
+      openFilePreview(file.url, file.name);
+    }
+  }catch(e){
+    toast('Could not load Technical Specification: '+e.message);
+  }finally{
+    btn.disabled = false;
+    btn.textContent = original;
+  }
+}
+// Called from the "Changes" button on each apartment list card. The button itself only renders
+// when aptChangesMap already has a non-empty entry for this apartment (see renderApartmentList /
+// loadAptChangesMap), so this just shows what's already been fetched — no loading state needed.
+function openTechSpecChangesFromList(aptId){
+  const text = aptChangesMap.get(String(aptId));
+  if(!text){ return; } // shouldn't happen — button isn't rendered without a cached entry
+  openTextPreview('Technical Specification Changes', text);
+}
+// Shows plain text (not a file) in the same modal shell used for file previews.
+function openTextPreview(title, text){
+  const modal = document.getElementById('file-preview-modal');
+  const body = document.getElementById('file-preview-body');
+  const titleEl = document.getElementById('file-preview-title');
+  if(!modal || !body) return;
+  titleEl.textContent = title || 'Details';
+  body.innerHTML = `<div class="file-preview-text">${formatChangesAsBullets(text)}</div>`;
+  modal.style.display = 'flex';
+}
+// In-app file preview modal — PDFs and images render directly; Office documents (xlsx/docx/pptx,
+// which is what Technical Specification files are) are rendered through Office Online's embed
+// viewer so the file opens inline instead of triggering a browser download.
+function openFilePreview(url, name){
+  const modal = document.getElementById('file-preview-modal');
+  const body = document.getElementById('file-preview-body');
+  const title = document.getElementById('file-preview-title');
+  if(!modal || !body) return;
+  title.textContent = name || 'Preview';
+  const lower = (name||'').toLowerCase();
+  let inner;
+  if(/\.(png|jpe?g|gif|webp|bmp|heic)$/.test(lower)){
+    // <img> subresource loads render fine regardless of the file's Content-Disposition header
+    // (that header only forces a download on a direct navigation, e.g. an <iframe> src).
+    inner = `<img src="${url}" class="file-preview-img" alt="${escapeHtml(name||'')}">`;
+  } else if(lower.endsWith('.pdf')){
+    // Monday's file URLs are served with Content-Disposition: attachment, so loading them
+    // directly into an <iframe> triggers a download instead of a preview. Routing through Google's
+    // viewer means Google's server fetches the file (disposition only affects a browser's own
+    // navigation, not a server-to-server fetch) and serves back a renderable page instead.
+    const viewerUrl = 'https://docs.google.com/viewer?url=' + encodeURIComponent(url) + '&embedded=true';
+    inner = `<iframe src="${viewerUrl}" class="file-preview-frame"></iframe>`;
+  } else {
+    // Office documents (xlsx/docx/pptx — what Technical Specification files are) via Office
+    // Online's own viewer, for the same reason: it fetches the file itself rather than the
+    // browser navigating straight to an attachment-disposition URL.
+    const viewerUrl = 'https://view.officeapps.live.com/op/embed.aspx?src=' + encodeURIComponent(url);
+    inner = `<iframe src="${viewerUrl}" class="file-preview-frame"></iframe>`;
+  }
+  body.innerHTML = inner;
+  modal.style.display = 'flex';
+}
+function closeFilePreview(){
+  const modal = document.getElementById('file-preview-modal');
+  if(modal) modal.style.display = 'none';
+  const body = document.getElementById('file-preview-body');
+  if(body) body.innerHTML = ''; // stop any loading iframe content once closed
 }
 function startChecklist(){
   const sup = document.getElementById('hdr-supervisor').value.trim();
-  if(!sup){ document.getElementById('hdr-error').textContent = 'Please enter the supervisor / inspector name.'; return; }
+  if(!sup){ document.getElementById('hdr-error').textContent = 'Please select the supervisor / inspector.'; return; }
   if(currentRound===2 && formItems.length===0){
     toast('No "Not Approved" items remain — this apartment may already be fully approved.');
   }
@@ -768,6 +1231,12 @@ function renderChecklist(){
   const body = document.getElementById('checklist-body');
   const sections = {};
   formItems.forEach((it, idx)=>{ (sections[it.section] = sections[it.section]||[]).push(idx); });
+  // Extra bedroom sections are only ever offered on the fresh Round 1 checklist (see
+  // addBedroomSection) — Round 2 only shows previously "Not Approved" items pulled from Monday,
+  // so re-running this logic there could add a duplicate bedroom section for one that was already
+  // fully approved and simply isn't in this round's item list.
+  const nextBedroomLabel = currentRound===1 ? EXTRA_BEDROOM_LABELS.find(l=>!sections[l]) : null;
+  const lastBedroomSecName = ["11. Bedroom 1", ...EXTRA_BEDROOM_LABELS].filter(l=>sections[l]).pop();
   let html = '';
   Object.keys(sections).forEach(secName=>{
     const idxs = sections[secName];
@@ -781,6 +1250,11 @@ function renderChecklist(){
         <button class="btn btn-secondary" style="margin-top:0;" onclick="addCustomItem('${escapeJsStr(secName)}','${cssId(secName)}')">Add to checklist</button>
       </div>
     </div>`;
+    if(nextBedroomLabel && secName === lastBedroomSecName){
+      html += `<div class="add-bedroom-card">
+        <button type="button" onclick="addBedroomSection('${escapeJsStr(nextBedroomLabel)}')">🛏️ + Add ${escapeHtml(nextBedroomLabel)} (copy of the Bedroom checklist)</button>
+      </div>`;
+    }
     html += `</div>`;
   });
   body.innerHTML = html;
@@ -874,6 +1348,26 @@ function addCustomItem(secName, secId){
   document.getElementById('custom-input-'+secId).classList.remove('show');
   renderChecklist();
 }
+// Called from the "+ Add Bedroom 2/3" button, shown only when the apartment actually has that
+// many bedrooms. Clones Bedroom 1's item list under the new section label and inserts it right
+// after the last bedroom section already on the checklist, so it lands in a sensible spot (before
+// Balcony/Cleaning) instead of at the very end.
+function addBedroomSection(label){
+  const template = CHECKLIST.find(s=>s.s === "11. Bedroom 1").items;
+  const newItems = template.map(text=>({
+    key: label+'|'+text, section: label, text, status:null, notes:'',
+    photoFile:null, photoDataUrl:null, subitemId:null, isCustom:false
+  }));
+  let insertAt = formItems.length;
+  for(let i=formItems.length-1;i>=0;i--){
+    if(formItems[i].section === "11. Bedroom 1" || EXTRA_BEDROOM_LABELS.includes(formItems[i].section)){
+      insertAt = i+1;
+      break;
+    }
+  }
+  formItems.splice(insertAt, 0, ...newItems);
+  renderChecklist();
+}
 function updateStats(){
   const total = formItems.length;
   const done = formItems.filter(i=>i.status).length;
@@ -910,14 +1404,95 @@ function goToReview(){
   document.getElementById('rev-notapproved').textContent = notApproved;
   document.getElementById('rev-notrelevant').textContent = notRelevant;
 
-  const showSignoff = currentRound===2 && notApproved===0 && formItems.length>0;
+  // Sign-off (and the PDF report that follows it) is offered whenever every item on THIS
+  // checklist is Approved/Not Relevant — whether that happens on the very first visit or only
+  // after a Round 2 re-check — rather than being forced to wait for a Round 2 pass that may
+  // never be needed.
+  const showSignoff = notApproved===0 && formItems.length>0;
   document.getElementById('signoff-section').style.display = showSignoff ? 'block' : 'none';
   if(showSignoff){
     document.getElementById('sign-supervisor').value = document.getElementById('hdr-supervisor').value;
+    document.getElementById('sign-contractor').value = currentContractorName || document.getElementById('hdr-contractor').value || '';
   }
   document.getElementById('review-error').textContent = '';
   document.getElementById('submit-btn').disabled = false;
   showScreen('screen-review');
+  if(showSignoff){
+    // The canvas needs a non-zero layout size to size its drawing surface correctly, so wait
+    // until the screen (and the signoff section within it) is actually visible before init'ing.
+    requestAnimationFrame(initContractorSignaturePad);
+  }
+}
+
+/* ============ CONTRACTOR SIGNATURE PAD ============ */
+let contractorSigCtx = null;
+let contractorSigHasInk = false;
+let contractorSigDrawing = false;
+let contractorSigLastPoint = null;
+function initContractorSignaturePad(){
+  const canvas = document.getElementById('contractor-sig-canvas');
+  if(!canvas) return;
+  // Size the backing bitmap to match the canvas's actual on-screen size (at the device's pixel
+  // ratio) so strokes stay crisp and line up with the finger/stylus regardless of screen density.
+  const rect = canvas.getBoundingClientRect();
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = Math.max(1, Math.round(rect.width * dpr));
+  canvas.height = Math.max(1, Math.round(rect.height * dpr));
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+  ctx.lineWidth = 2.2;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.strokeStyle = '#1a2b4c';
+  contractorSigCtx = ctx;
+  contractorSigHasInk = false;
+
+  function pointFromEvent(e){
+    const r = canvas.getBoundingClientRect();
+    const t = (e.touches && e.touches[0]) || e;
+    return { x: t.clientX - r.left, y: t.clientY - r.top };
+  }
+  function start(e){
+    e.preventDefault();
+    contractorSigDrawing = true;
+    contractorSigLastPoint = pointFromEvent(e);
+  }
+  function move(e){
+    if(!contractorSigDrawing) return;
+    e.preventDefault();
+    const p = pointFromEvent(e);
+    ctx.beginPath();
+    ctx.moveTo(contractorSigLastPoint.x, contractorSigLastPoint.y);
+    ctx.lineTo(p.x, p.y);
+    ctx.stroke();
+    contractorSigLastPoint = p;
+    contractorSigHasInk = true;
+  }
+  function end(e){ if(e) e.preventDefault(); contractorSigDrawing = false; }
+
+  // Pointer Events cover mouse/touch/pen in one API on modern browsers; touch handlers are kept
+  // as a fallback for older embedded webviews.
+  canvas.onpointerdown = start;
+  canvas.onpointermove = move;
+  canvas.onpointerup = end;
+  canvas.onpointercancel = end;
+  canvas.ontouchstart = start;
+  canvas.ontouchmove = move;
+  canvas.ontouchend = end;
+}
+function clearContractorSignature(){
+  const canvas = document.getElementById('contractor-sig-canvas');
+  if(!canvas || !contractorSigCtx) return;
+  contractorSigCtx.clearRect(0, 0, canvas.width, canvas.height);
+  contractorSigHasInk = false;
+}
+function blobToDataUrl(blob){
+  return new Promise((resolve, reject)=>{
+    const reader = new FileReader();
+    reader.onload = ()=>resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
 }
 
 /* ============ SUBMIT (queues a background sync job — does not block the UI) ============ */
@@ -935,10 +1510,32 @@ async function submitInspection(){
     const supName = document.getElementById('sign-supervisor').value.trim();
     const conName = document.getElementById('sign-contractor').value.trim();
     if(!supName || !conName || !supConfirm || !conConfirm){
-      err.textContent = 'Both Supervisor and Contractor must enter their name and confirm before final submit.';
+      err.textContent = 'Both Supervisor and Contractor must be selected/entered and confirmed before final submit.';
       return;
     }
-    signoff = {supervisorName: supName, contractorName: conName};
+    if(!contractorSigHasInk){
+      err.textContent = 'Please have the contractor sign above before final submit.';
+      return;
+    }
+    const sigCanvas = document.getElementById('contractor-sig-canvas');
+    let signatureBlob;
+    try{
+      // canvas.toBlob() has been observed to hang indefinitely in some embedded/tablet webviews,
+      // which would otherwise freeze the whole submit flow forever. Race it against a timeout so
+      // the user always gets a clear error instead of a dead "Submit" button.
+      signatureBlob = await Promise.race([
+        new Promise(resolve=>sigCanvas.toBlob(resolve, 'image/png')),
+        new Promise((_,reject)=>setTimeout(()=>reject(new Error('timed out capturing signature')), 8000))
+      ]);
+    }catch(e){
+      err.textContent = 'Could not capture the signature (' + e.message + '). Please try signing again.';
+      return;
+    }
+    if(!signatureBlob){
+      err.textContent = 'Could not capture the signature. Please try signing again.';
+      return;
+    }
+    signoff = {supervisorName: supName, contractorName: conName, signatureBlob};
   }
   btn.disabled = true;
 
@@ -948,6 +1545,7 @@ async function submitInspection(){
     apartmentId: currentApartment.id,
     apartmentName: currentApartment.name,
     projectId: currentProject.id,
+    projectName: currentProject.name,
     round: currentRound,
     today,
     header: { date: document.getElementById('hdr-date').value, supervisor: document.getElementById('hdr-supervisor').value.trim() },
@@ -1099,7 +1697,10 @@ async function processJob(job){
       if(pending.length){
         await asyncPool(SYNC_CONCURRENCY, pending, (it)=>processJobItem(job, it));
       }
-      job.stage = job.round===1 ? 'done' : 'finalize';
+      // A Round 1 checklist that came back fully clean (every item Approved/Not Relevant) carries
+      // its own signoff and skips straight to 'finalize' just like Round 2 does — only a Round 1
+      // job WITHOUT a signoff (i.e. some items still need a re-check) is actually "done" here.
+      job.stage = (job.round===1 && !job.signoff) ? 'done' : 'finalize';
       await persistJob(job);
     }
     if(job.stage === 'finalize'){
@@ -1117,8 +1718,34 @@ async function processJob(job){
       }
       const q = `mutation($boardId:ID!, $itemId:ID!, $cv:JSON!){ change_multiple_column_values(board_id:$boardId, item_id:$itemId, column_values:$cv){ id } }`;
       await mondayApi(q, {boardId: BOARD_INSPECTIONS, itemId: job.inspectionItemId, cv: JSON.stringify(cv)});
-      job.stage = 'done';
+      job.stage = job.signoff ? 'generate_report' : 'done';
       await persistJob(job);
+    }
+    if(job.stage === 'generate_report'){
+      try{
+        await generateAndUploadReport(job);
+        job.stage = 'done';
+        await persistJob(job);
+      }catch(e){
+        // The approval itself (Round2Approved status, sign-off checkboxes/dates) was already
+        // written to Monday in the 'finalize' stage above — only the bonus PDF report failed.
+        // Cap retries so a broken report generator (missing jsPDF, a hung signature capture, an
+        // upload-relay error) can't loop forever and leave the sync banner stuck on "uploading".
+        job.reportAttempts = (job.reportAttempts||0) + 1;
+        console.warn('Report generation failed (attempt '+job.reportAttempts+'):', job.id, e.message);
+        if(job.reportAttempts >= 3){
+          job.stage = 'done';
+          job.lastError = null;
+          await persistJob(job);
+          toast(`⚠️ ${job.apartmentName}: sign-off was saved, but the PDF report could not be generated (${e.message}).`);
+        } else {
+          job.lastError = e.message;
+          await persistJob(job);
+          updateSyncBanner();
+          scheduleRetry(job);
+          return;
+        }
+      }
     }
     if(job.stage === 'done'){
       job.lastError = null;
@@ -1163,12 +1790,185 @@ async function processJobItem(job, it){
     await persistJob(job);
   }
   if(it.photoBlob && !it.photoUploaded){
-    const upQ = `mutation($item_id:ID!, $column_id:String!, $file:File!){ add_file_to_column(item_id:$item_id, column_id:$column_id, file:$file){ id } }`;
-    await mondayFileUpload(upQ, it.subitemId, SUBCOL.photo, it.photoBlob);
-    it.photoUploaded = true;
+    try{
+      const upQ = `mutation($item_id:ID!, $column_id:String!, $file:File!){ add_file_to_column(item_id:$item_id, column_id:$column_id, file:$file){ id } }`;
+      await mondayFileUpload(upQ, it.subitemId, SUBCOL.photo, it.photoBlob);
+      it.photoUploaded = true;
+    }catch(e){
+      // The checklist item itself (status + notes) is already safely saved on Monday above —
+      // only the photo attachment failed. Cap retries per item so one broken/oversized photo
+      // can't keep the whole inspection "uploading" forever even after every other item (and
+      // every other photo) has finished — this was happening indefinitely before.
+      it.photoAttempts = (it.photoAttempts||0) + 1;
+      console.warn(`Photo upload failed (attempt ${it.photoAttempts}) for "${it.text}":`, e.message);
+      if(it.photoAttempts >= 3){
+        it.photoUploaded = 'failed'; // truthy — stops this item from being retried again
+        it.photoFailReason = e.message;
+        toast(`⚠️ Photo for "${it.text}" could not be uploaded after 3 tries — the rest of the inspection was saved.`);
+      } else {
+        await persistJob(job);
+        throw e; // let the outer job retry/backoff (see processJob/scheduleRetry) try again shortly
+      }
+    }
   }
   it.done = true;
   await persistJob(job);
+}
+
+// Runs once, right after final sign-off — whether that happens on a clean Round 1 pass or after
+// a Round 2 re-check — pulls the finished checklist back from Monday, builds a branded PDF
+// summary (item counts, a Final Approval block with the supervisor's confirmation and the
+// contractor's signature, then the itemized checklist), uploads it to the "Final Report PDF"
+// column, and marks the item "Final Report Sent". If this step fails (lost signal, etc.) it
+// throws so the outer processJob catch retries it — the job is already fully approved on Monday
+// by this point, so a retry here only re-generates the PDF, it never re-submits checklist data.
+async function generateAndUploadReport(job){
+  const q = `query{
+    items(ids:[${job.inspectionItemId}]){
+      subitems{
+        id
+        name
+        column_values(ids:["${SUBCOL.status}","${SUBCOL.section}","${SUBCOL.notes}"]){ id text }
+      }
+    }
+  }`;
+  const data = await mondayApi(q);
+  const subs = (data.items[0] && data.items[0].subitems) || [];
+
+  if(!window.jspdf || !window.jspdf.jsPDF){
+    throw new Error('PDF library did not load (jsPDF unavailable)');
+  }
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({unit:'pt', format:'a4'});
+
+  // Palette matches the app's own branding (see the --navy/--gold/etc. CSS variables) so the
+  // exported report reads as one connected product rather than a generic text dump.
+  const NAVY=[26,43,76], GOLD=[201,162,75], GREEN=[0,181,105], RED=[214,58,80], GRAY=[103,104,121],
+        LIGHT=[245,246,248], BORDER=[217,220,230], DARK=[35,40,58];
+  const pageWidth = 595, marginX = 40, contentRight = 555, pageBottom = 780;
+  let y;
+
+  // ---- Header band ----
+  doc.setFillColor(...NAVY); doc.rect(0, 0, pageWidth, 86, 'F');
+  doc.setTextColor(255,255,255);
+  doc.setFontSize(17); doc.setFont(undefined, 'bold');
+  doc.text('Apartment Delivery Inspection Report', marginX, 38);
+  doc.setFontSize(10.5); doc.setFont(undefined, 'normal');
+  doc.text(`${job.apartmentName}  •  ${job.projectName || ''}`, marginX, 58);
+  doc.setFontSize(9); doc.setTextColor(210,216,232);
+  doc.text(`Round ${job.round}  •  ${job.today}`, marginX, 74);
+  doc.setTextColor(0,0,0);
+  y = 112;
+
+  // ---- Summary count chips ----
+  const statusOf = sub => getColText(sub, SUBCOL.status);
+  const chips = [
+    {label:'Total Items', value: subs.length, color: NAVY},
+    {label:'Approved', value: subs.filter(s=>statusOf(s)==='Approved').length, color: GREEN},
+    {label:'Not Approved', value: subs.filter(s=>statusOf(s)==='Not Approved').length, color: RED},
+    {label:'Not Relevant', value: subs.filter(s=>statusOf(s)==='Not Relevant').length, color: GRAY}
+  ];
+  const gap = 10;
+  const chipW = (contentRight - marginX - gap*(chips.length-1)) / chips.length;
+  chips.forEach((c,i)=>{
+    const cx = marginX + i*(chipW+gap);
+    doc.setDrawColor(...BORDER); doc.setFillColor(...LIGHT);
+    doc.roundedRect(cx, y, chipW, 46, 6, 6, 'FD');
+    doc.setFontSize(16); doc.setFont(undefined, 'bold'); doc.setTextColor(...c.color);
+    doc.text(String(c.value), cx+12, y+23);
+    doc.setFontSize(8.5); doc.setFont(undefined, 'normal'); doc.setTextColor(...GRAY);
+    doc.text(c.label, cx+12, y+36);
+  });
+  doc.setTextColor(0,0,0);
+  y += 46 + 26;
+
+  // ---- Final Approval block: inspector confirmation + contractor name/signature side by side ----
+  if(job.signoff){
+    const boxTop = y, boxH = 122, boxW = contentRight - marginX, midX = marginX + boxW/2;
+    doc.setDrawColor(...GOLD); doc.setLineWidth(1.3);
+    doc.roundedRect(marginX, boxTop, boxW, boxH, 8, 8, 'S');
+    doc.setLineWidth(1);
+    doc.setFontSize(11); doc.setFont(undefined, 'bold'); doc.setTextColor(...NAVY);
+    doc.text('✓ Final Approval — All items Approved or Not Relevant', marginX+14, boxTop+22);
+    doc.setDrawColor(...BORDER);
+    doc.line(midX, boxTop+32, midX, boxTop+boxH-14);
+
+    // Supervisor / inspector column
+    doc.setFontSize(8.5); doc.setFont(undefined, 'bold'); doc.setTextColor(...GRAY);
+    doc.text('SUPERVISOR / INSPECTOR', marginX+14, boxTop+46);
+    doc.setFontSize(12.5); doc.setFont(undefined, 'bold'); doc.setTextColor(...DARK);
+    doc.text(job.signoff.supervisorName || '—', marginX+14, boxTop+64);
+    doc.setFontSize(9.5); doc.setFont(undefined, 'normal'); doc.setTextColor(...GREEN);
+    doc.text(`✓ Confirmed approved on ${job.today}`, marginX+14, boxTop+80);
+
+    // Contractor column (name + drawn signature)
+    const rx = midX + 14;
+    doc.setFontSize(8.5); doc.setFont(undefined, 'bold'); doc.setTextColor(...GRAY);
+    doc.text('CONTRACTOR', rx, boxTop+46);
+    doc.setFontSize(12.5); doc.setFont(undefined, 'bold'); doc.setTextColor(...DARK);
+    doc.text(job.signoff.contractorName || '—', rx, boxTop+64);
+    doc.setFontSize(9.5); doc.setFont(undefined, 'normal'); doc.setTextColor(...GREEN);
+    doc.text(`✓ Confirmed approved on ${job.today}`, rx, boxTop+80);
+    if(job.signoff.signatureBlob){
+      try{
+        const dataUrl = await blobToDataUrl(job.signoff.signatureBlob);
+        doc.addImage(dataUrl, 'PNG', rx, boxTop+86, 150, 28);
+      }catch(e){
+        // Best-effort — the report still generates fine without the signature image.
+        console.warn('Could not embed contractor signature in report', e.message);
+      }
+    }
+    doc.setTextColor(0,0,0);
+    y = boxTop + boxH + 24;
+  }
+
+  // ---- Itemized checklist, grouped by section ----
+  doc.setFontSize(13); doc.setFont(undefined, 'bold'); doc.setTextColor(...NAVY);
+  doc.text('Checklist Detail', marginX, y); y += 6;
+  doc.setDrawColor(...BORDER); doc.line(marginX, y, contentRight, y); y += 20;
+  doc.setTextColor(0,0,0);
+
+  const bySection = {};
+  subs.forEach(sub=>{
+    const statusText = getColText(sub, SUBCOL.status);
+    const sectionText = getColText(sub, SUBCOL.section) || 'Other';
+    const notesText = getColText(sub, SUBCOL.notes);
+    (bySection[sectionText] = bySection[sectionText] || []).push({name: sub.name, status: statusText, notes: notesText});
+  });
+
+  Object.keys(bySection).forEach(section=>{
+    if(y > pageBottom - 40){ doc.addPage(); y = 50; }
+    doc.setFontSize(12); doc.setFont(undefined, 'bold'); doc.setTextColor(...NAVY);
+    doc.text(section, marginX, y); y += 16;
+    doc.setFontSize(10); doc.setFont(undefined, 'normal'); doc.setTextColor(0,0,0);
+    bySection[section].forEach(it=>{
+      if(y > pageBottom){ doc.addPage(); y = 50; }
+      const statusColor = it.status === 'Approved' ? GREEN : (it.status === 'Not Relevant' ? GRAY : RED);
+      const mark = it.status === 'Approved' ? '✓' : (it.status === 'Not Relevant' ? '–' : '✗');
+      doc.setTextColor(...statusColor);
+      doc.text(mark, marginX+2, y);
+      doc.setTextColor(0,0,0);
+      const wrapped = doc.splitTextToSize(`${it.name} — ${it.status || 'Not set'}`, 495);
+      doc.text(wrapped, marginX + 16, y); y += 14 * wrapped.length;
+      if(it.notes){
+        const noteWrapped = doc.splitTextToSize('Notes: ' + it.notes, 480);
+        doc.setTextColor(...GRAY);
+        doc.text(noteWrapped, marginX + 24, y); y += 13 * noteWrapped.length;
+        doc.setTextColor(0,0,0);
+      }
+    });
+    y += 8;
+  });
+
+  const blob = doc.output('blob');
+  const fileName = `${job.apartmentName} - Delivery Report.pdf`;
+  const uploadQ = `mutation($item_id:ID!, $column_id:String!, $file:File!){ add_file_to_column(item_id:$item_id, column_id:$column_id, file:$file){ id } }`;
+  await mondayFileUpload(uploadQ, job.inspectionItemId, COL.reportPdf, new File([blob], fileName, {type:'application/pdf'}));
+
+  // Report is attached — this is the board's true "done" state (distinct from "Round 2 Approved",
+  // which only records that sign-off happened).
+  const statusQ = `mutation($boardId:ID!, $itemId:ID!, $cv:JSON!){ change_multiple_column_values(board_id:$boardId, item_id:$itemId, column_values:$cv){ id } }`;
+  await mondayApi(statusQ, {boardId: BOARD_INSPECTIONS, itemId: job.inspectionItemId, cv: JSON.stringify({[COL.status]: {label: STATUS_LABELS.finalReportSent}})});
 }
 
 function scheduleRetry(job){
@@ -1212,13 +2012,44 @@ function updateSyncBanner(){
     : `Submitting ${jobs.length} inspections… please don't close the app yet.${failing?` (${failing} waiting for signal)`:''}`;
   panel.innerHTML = jobs.map(j=>{
     const doneCount = j.items.filter(i=>i.done).length;
-    const statusTxt = j.lastError ? 'Waiting for signal — will retry automatically' : `Saving (${doneCount}/${j.items.length})…`;
-    return `<div class="sync-job-row"><b>${escapeHtml(j.apartmentName)}</b> · Round ${j.round}<br><span class="sub" style="margin:0;">${statusTxt}</span></div>`;
+    const statusTxt = j.lastError
+      ? 'Waiting for signal — will retry automatically'
+      : j.stage === 'generate_report'
+        ? 'Generating final report PDF…'
+        : `Saving (${doneCount}/${j.items.length})…`;
+    return `<div class="sync-job-row">
+      <div class="sync-job-row-top">
+        <span><b>${escapeHtml(j.apartmentName)}</b> · Round ${j.round}</span>
+        <button type="button" class="sync-cancel-btn" onclick="event.stopPropagation();cancelSyncJob('${j.id}')">✕ Cancel</button>
+      </div>
+      <span class="sub" style="margin:0;">${statusTxt}</span>
+    </div>`;
   }).join('');
 }
 function toggleSyncPanel(){
   const panel = document.getElementById('sync-panel');
   panel.style.display = panel.style.display==='block' ? 'none' : 'block';
+}
+// Manual escape hatch for a submission that's stuck retrying (e.g. a stale in-flight request from
+// before a connectivity fix, or a persistently unreachable network) — lets the inspector stop it
+// themselves instead of waiting indefinitely, at the cost of anything from that attempt not yet
+// saved to Monday. Safe to use: nothing this job already wrote to Monday is undone, and resuming
+// the same apartment afterward only re-submits whatever didn't make it (see the idempotent
+// subitem/status-synced tracking in processJobItem and loadRound2Items pulling only what's still
+// "Not Approved").
+async function cancelSyncJob(jobId){
+  const job = activeJobs.get(jobId);
+  if(!job) return;
+  const ok = confirm(`Stop syncing "${job.apartmentName}" (Round ${job.round})? Anything from this submission not yet saved to Monday will be lost — you can redo it from the apartment list right after.`);
+  if(!ok) return;
+  activeJobs.delete(jobId);
+  await dbDelete(jobId);
+  updateSyncBanner();
+  toast(`Cancelled — you can resubmit ${job.apartmentName} from the apartment list.`);
+  // Re-check Monday's actual current status for this apartment — the cancelled attempt may have
+  // already written some of its data before getting stuck, so the cached status/badge could be
+  // stale until this refreshes.
+  refreshApartmentStatusIfVisible(job.projectId);
 }
 
 function resetToHome(){
