@@ -287,8 +287,11 @@ const REPAIR_COL = {
   reportedBy: "text_mm6xq30m",
   manager: "multiple_person_mm6xk668",
   status: "color_mm6xmk13",
-  sentToContractor: "boolean_mm6xx02s"
+  sentToContractor: "boolean_mm6xx02s",
+  exportPdf: "file_mm6xk16s"
 };
+const REPAIRS_NEW_ISSUE_GROUP = "topics"; // default group new repair items land in
+const REPAIRS_EXPORTS_GROUP = "group_mm6xm3ez"; // "Contractor Exports" group — history of generated PDFs
 
 const CATEGORIES = ["Plumbing","Electrical","Paint","Flooring & Walls","Furniture","Appliances","Doors/Windows/Locks","HVAC/AC","Other"];
 const COMMON_AREAS = ["Roof","Basement","Entrance/Lobby","Corridor","Facade","Elevator","Parking/Garage","Stairwell","Other"];
@@ -678,11 +681,11 @@ async function submitOneIssue(issue, info, reporterName){
     columnValues[REPAIR_COL.manager] = {personsAndTeams:[{id:Number(info.managerId), kind:'person'}]};
   }
   const itemName = `${currentBuilding.name} — ${currentLocation.label} — ${issue.category}`;
-  const mutation = `mutation($boardId:ID!, $itemName:String!, $columnValues:JSON!){
-    create_item(board_id:$boardId, item_name:$itemName, column_values:$columnValues){ id }
+  const mutation = `mutation($boardId:ID!, $groupId:String!, $itemName:String!, $columnValues:JSON!){
+    create_item(board_id:$boardId, group_id:$groupId, item_name:$itemName, column_values:$columnValues){ id }
   }`;
   const data = await mondayApi(mutation, {
-    boardId: BOARD_REPAIRS, itemName, columnValues: JSON.stringify(columnValues)
+    boardId: BOARD_REPAIRS, groupId: REPAIRS_NEW_ISSUE_GROUP, itemName, columnValues: JSON.stringify(columnValues)
   });
   const itemId = data.create_item.id;
 
@@ -886,15 +889,45 @@ async function generateContractorPdf(){
       y += Math.max(descLines.length * 13, 110) + 20;
     }
 
-    doc.save(`VESTA-Repairs-${document.getElementById('exp-bld-name').textContent.replace(/[^a-z0-9]+/gi,'-')}-${new Date().toISOString().slice(0,10)}.pdf`);
+    const bldName = document.getElementById('exp-bld-name').textContent;
+    const dateStr = new Date().toISOString().slice(0,10);
+    const fileBaseName = `VESTA-Repairs-${bldName.replace(/[^a-z0-9]+/gi,'-')}-${dateStr}`;
+    doc.save(`${fileBaseName}.pdf`);
 
     await Promise.all(selected.map(it => markSentToContractor(it.id).catch(()=>{})));
-    toast('PDF generated and downloaded.');
+
+    try{
+      await uploadExportPdfToMonday(doc, bldName, dateStr, fileBaseName, selected);
+      toast('PDF downloaded, and attached to a new item in the REPAIRS board\'s "Contractor Exports" group.');
+    }catch(e){
+      toast('PDF downloaded, but could not be attached inside Monday: ' + e.message, 8000);
+    }
   }catch(e){
     toast('Failed to generate PDF: ' + e.message, 8000);
   }
   btn.textContent = 'Generate PDF';
   btn.disabled = false;
+}
+async function uploadExportPdfToMonday(doc, bldName, dateStr, fileBaseName, selected){
+  const pdfBlob = doc.output('blob');
+  const pdfFile = new File([pdfBlob], `${fileBaseName}.pdf`, {type:'application/pdf'});
+  const summaryLines = selected.map(it => `• ${it.location} — ${it.category} (${it.reportedBy || 'n/a'})`).join('\n');
+  const columnValues = {
+    [REPAIR_COL.building]: {item_ids:[Number(exportBuildingId)]},
+    [REPAIR_COL.description]: {text: `Contractor export generated ${new Date().toLocaleString()}, covering ${selected.length} issue${selected.length===1?'':'s'}:\n${summaryLines}`}
+  };
+  const mutation = `mutation($boardId:ID!, $groupId:String!, $itemName:String!, $columnValues:JSON!){
+    create_item(board_id:$boardId, group_id:$groupId, item_name:$itemName, column_values:$columnValues){ id }
+  }`;
+  const data = await mondayApi(mutation, {
+    boardId: BOARD_REPAIRS, groupId: REPAIRS_EXPORTS_GROUP,
+    itemName: `${bldName} — Export ${dateStr}`, columnValues: JSON.stringify(columnValues)
+  });
+  const itemId = data.create_item.id;
+  const uploadQuery = `mutation ($file: File!, $item_id: ID!, $column_id: String!) {
+    add_file_to_column (item_id: $item_id, column_id: $column_id, file: $file) { id }
+  }`;
+  await mondayFileUpload(uploadQuery, itemId, REPAIR_COL.exportPdf, pdfFile);
 }
 async function markSentToContractor(itemId){
   const mutation = `mutation($boardId:ID!, $itemId:ID!, $columnValues:JSON!){
