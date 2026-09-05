@@ -1,0 +1,912 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>VESTA Repairs</title>
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="VESTA Repairs">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#1a2b4c">
+<style>
+  :root{
+    --navy:#1a2b4c; --navy-dark:#101c34; --gold:#c9a24b;
+    --blue:#0073ea; --green:#00c875; --red:#e2445c; --gray:#676879; --gray-bg:#f5f6f8;
+    --border:#d9dce6; --dark:#23283a; --orange:#fdab3d;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;padding:0;height:100%;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;background:var(--gray-bg);color:var(--dark);}
+  #app{max-width:780px;margin:0 auto;min-height:100%;background:#fff;display:flex;flex-direction:column;box-shadow:0 0 40px rgba(0,0,0,0.06);}
+  .screen{display:none;flex-direction:column;flex:1;}
+  .screen.active{display:flex;}
+  .screen-pad{padding:20px;padding-bottom:110px;flex:1;}
+  h1{font-size:21px;margin:0 0 4px;font-weight:800;letter-spacing:-0.2px;}
+  h2{font-size:17px;margin:22px 0 10px;color:var(--dark);font-weight:800;}
+  p.sub{color:var(--gray);margin:0 0 20px;font-size:14px;line-height:1.4;}
+  label{font-size:12.5px;font-weight:700;color:var(--gray);display:block;margin:14px 0 6px;text-transform:uppercase;letter-spacing:0.3px;}
+  input[type=text],textarea,select{
+    width:100%;padding:14px;font-size:16px;border:1.5px solid var(--border);border-radius:10px;background:#fff;color:var(--dark);
+  }
+  textarea{min-height:90px;resize:vertical;}
+  button{cursor:pointer;font-family:inherit;}
+  .btn{display:block;width:100%;padding:16px;font-size:16px;font-weight:800;border:none;border-radius:12px;margin-top:16px;transition:transform .06s;}
+  .btn:active{transform:scale(0.98);}
+  .btn:disabled{opacity:0.5;}
+  .btn-primary{background:var(--navy);color:#fff;}
+  .btn-primary:disabled{background:#aab3c5;}
+  .btn-secondary{background:#eef1f8;color:var(--navy);}
+  .btn-ghost{background:transparent;color:var(--gray);border:1.5px solid var(--border);}
+  .btn-danger{background:#fff1f1;color:var(--red);}
+
+  .brand-header{background:linear-gradient(135deg,var(--navy) 0%,var(--navy-dark) 100%);color:#fff;padding:22px 20px;position:relative;overflow:hidden;flex-shrink:0;}
+  .brand-header::after{content:"";position:absolute;right:-40px;top:-40px;width:160px;height:160px;border-radius:50%;background:rgba(201,162,75,0.12);}
+  .brand-row{display:flex;align-items:center;gap:12px;position:relative;z-index:1;}
+  .brand-logo{height:30px;width:auto;flex-shrink:0;display:flex;align-items:center;}
+  .brand-logo img{height:100%;width:auto;object-fit:contain;display:block;}
+  .brand-text .app-name{font-size:17px;font-weight:800;letter-spacing:0.3px;}
+  .brand-header .app-sub{
+    font-family:'Poppins',-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
+    font-size:13px;font-weight:600;text-align:center;letter-spacing:1.4px;text-transform:uppercase;
+    color:rgba(255,255,255,0.88);margin-top:16px;position:relative;z-index:1;
+  }
+  .brand-header .back-icon{background:none;border:none;color:#fff;font-size:22px;padding:0 6px 0 0;}
+  .brand-header .mgr-link{margin-left:auto;background:none;border:none;color:rgba(255,255,255,0.85);font-size:12.5px;font-weight:700;padding:6px;position:relative;z-index:1;}
+
+  .topbar{display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--border);position:sticky;top:0;background:#fff;z-index:5;}
+  .topbar .back{font-size:22px;color:var(--navy);border:none;background:none;padding:4px 8px;font-weight:700;}
+  .topbar .title{font-weight:800;font-size:16px;flex:1;}
+
+  .list-card{border:1.5px solid var(--border);border-radius:12px;padding:15px;margin-bottom:10px;background:#fff;transition:border-color .1s;cursor:pointer;}
+  .list-card:active{border-color:var(--navy);}
+  .list-card .name{font-weight:800;font-size:15px;color:var(--dark);}
+  .list-card .meta{color:var(--gray);font-size:12.5px;margin-top:2px;}
+
+  .chip-grid{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:6px;}
+  .area-chip{background:#eef1f8;color:var(--navy);border:1.5px solid transparent;font-size:13px;font-weight:800;padding:10px 16px;border-radius:20px;}
+  .area-chip:active{border-color:var(--navy);}
+
+  .chip{display:inline-block;background:#eef1f8;color:var(--navy);font-size:11.5px;font-weight:800;padding:4px 10px;border-radius:20px;margin-bottom:10px;}
+  .cat-grid{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:4px;}
+  .cat-btn{background:#eef1f8;color:var(--navy);border:1.5px solid transparent;font-size:13px;font-weight:800;padding:9px 14px;border-radius:10px;}
+  .cat-btn.sel{background:var(--navy);color:#fff;}
+
+  .photo-btn{display:inline-flex;align-items:center;gap:6px;background:#fff;border:1.5px dashed var(--border);border-radius:8px;padding:11px 14px;font-size:13.5px;font-weight:700;color:var(--gray);width:100%;justify-content:center;margin-top:14px;}
+  .photo-btn.has-photo{border-style:solid;border-color:var(--green);color:var(--green);}
+  .photo-preview{margin-top:10px;text-align:center;}
+  .photo-preview img{max-width:100%;max-height:220px;border-radius:10px;border:1px solid var(--border);}
+
+  .issue-card{border:1.5px solid var(--border);border-radius:12px;padding:12px;margin-bottom:10px;display:flex;gap:12px;background:#fff;}
+  .issue-card img{width:56px;height:56px;object-fit:cover;border-radius:8px;flex-shrink:0;}
+  .issue-card .body{flex:1;min-width:0;}
+  .issue-card .cat{font-weight:800;font-size:13px;color:var(--navy);}
+  .issue-card .desc{font-size:12.5px;color:var(--gray);margin-top:2px;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;}
+  .issue-card .remove{background:none;border:none;color:var(--red);font-size:20px;padding:0 4px;align-self:flex-start;}
+  .issue-card.failed{border-color:var(--red);background:#fff8f8;}
+  .issue-status{font-size:11px;font-weight:800;margin-top:4px;}
+  .issue-status.ok{color:var(--green);}
+  .issue-status.err{color:var(--red);}
+  .issue-status.pending{color:var(--gray);}
+
+  .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--dark);color:#fff;padding:12px 20px;border-radius:10px;font-size:14px;z-index:99;max-width:90%;text-align:center;}
+  .center-box{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:20px;}
+  .center-box .icon{font-size:52px;margin-bottom:16px;}
+  .search-box{margin-bottom:14px;}
+  .error-text{color:var(--red);font-size:13px;margin-top:8px;}
+  .spinner{border:3px solid #eee;border-top:3px solid var(--navy);border-radius:50%;width:26px;height:26px;animation:spin 0.8s linear infinite;margin:0 auto;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+  .footer-note{font-size:11.5px;color:var(--gray);text-align:center;margin-top:20px;}
+  .link-btn{background:none;border:none;color:var(--navy);font-size:13px;font-weight:700;text-align:center;display:block;width:100%;margin-top:14px;}
+
+  .progress-bar{position:sticky;bottom:0;background:#fff;border-top:1px solid var(--border);padding:12px 16px;display:flex;align-items:center;gap:12px;}
+  .progress-bar .stats{font-size:12.5px;color:var(--gray);flex:1;}
+  .progress-bar .stats b{color:var(--dark);}
+  .progress-bar .go{background:var(--navy);color:#fff;border:none;border-radius:10px;padding:12px 20px;font-weight:800;font-size:14px;white-space:nowrap;}
+  .progress-bar .go:disabled{background:#aab3c5;}
+
+  .export-row{border:1.5px solid var(--border);border-radius:12px;padding:12px;margin-bottom:10px;display:flex;gap:12px;align-items:flex-start;background:#fff;}
+  .export-row input[type=checkbox]{width:22px;height:22px;flex-shrink:0;margin-top:2px;}
+  .export-row img{width:52px;height:52px;object-fit:cover;border-radius:8px;flex-shrink:0;}
+  .export-row .body{flex:1;min-width:0;}
+  .export-row .cat{font-weight:800;font-size:13px;color:var(--navy);}
+  .export-row .meta{font-size:11.5px;color:var(--gray);margin-top:2px;}
+  .export-row .desc{font-size:12.5px;color:var(--dark);margin-top:4px;}
+  .sent-badge{display:inline-block;background:#eef1f8;color:var(--gray);font-size:10.5px;font-weight:800;padding:2px 8px;border-radius:10px;margin-left:6px;}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ============ BUILDINGS ============ -->
+  <div class="screen active" id="screen-buildings">
+    <div class="brand-header">
+      <div class="brand-row">
+        <div class="brand-logo"></div>
+        <div class="brand-text"><div class="app-name">VESTA Repairs</div></div>
+        <button type="button" class="mgr-link" onclick="enterExport()">Export for Contractor →</button>
+      </div>
+      <div class="app-sub">Technical Issue Reporting</div>
+    </div>
+    <div class="screen-pad">
+      <h1>Select a building</h1>
+      <p class="sub">Choose the project you're reporting an issue for.</p>
+      <input type="text" class="search-box" id="bld-search" placeholder="Search buildings..." oninput="renderBuildingList()">
+      <div id="bld-loading" class="center-box" style="padding:30px 0;"><div class="spinner"></div></div>
+      <div id="bld-list"></div>
+      <p class="footer-note" id="app-version-note"></p>
+    </div>
+  </div>
+
+  <!-- ============ UNITS (apartments + common areas) ============ -->
+  <div class="screen" id="screen-units">
+    <div class="brand-header">
+      <div class="brand-row">
+        <button type="button" class="back-icon" onclick="showScreen('screen-buildings')">←</button>
+        <div class="brand-text"><div class="app-name" id="units-bld-name"></div></div>
+      </div>
+      <div class="app-sub">Select apartment or area</div>
+    </div>
+    <div class="screen-pad">
+      <h2>Common areas</h2>
+      <div class="chip-grid" id="common-area-list"></div>
+
+      <h2>Apartments</h2>
+      <input type="text" class="search-box" id="apt-search" placeholder="Search apartments..." oninput="renderApartmentList()">
+      <div id="apt-list"></div>
+      <p class="sub" id="apt-empty-note" style="display:none;">No apartments found for this building.</p>
+    </div>
+  </div>
+
+  <!-- ============ ISSUES (add/list/submit) ============ -->
+  <div class="screen" id="screen-issues">
+    <div class="brand-header">
+      <div class="brand-row">
+        <button type="button" class="back-icon" onclick="showScreen('screen-units')">←</button>
+        <div class="brand-text"><div class="app-name" id="issues-location-name"></div></div>
+      </div>
+      <div class="app-sub" id="issues-bld-name"></div>
+    </div>
+    <div class="screen-pad">
+      <div id="issue-form-card" style="border:1.5px solid var(--border);border-radius:12px;padding:16px;margin-bottom:18px;">
+        <label>Issue category</label>
+        <div class="cat-grid" id="cat-grid"></div>
+
+        <label>Describe the issue</label>
+        <textarea id="issue-desc" placeholder="What's wrong, exactly where, etc."></textarea>
+
+        <input type="file" accept="image/*" capture="environment" id="issue-photo-input" style="display:none;" onchange="handleIssuePhoto(this)">
+        <button type="button" class="photo-btn" id="issue-photo-btn" onclick="document.getElementById('issue-photo-input').click()">📷 Add a required photo</button>
+        <div class="photo-preview" id="issue-photo-preview" style="display:none;"></div>
+
+        <button type="button" class="btn btn-secondary" onclick="addIssueToList()">+ Add this issue</button>
+        <div class="error-text" id="issue-form-error"></div>
+      </div>
+
+      <h2>Issues to report (<span id="issue-count">0</span>)</h2>
+      <div id="issue-list"></div>
+      <p class="sub" id="issue-list-empty">No issues added yet — fill in the form above and tap "Add this issue".</p>
+
+      <label>Your name</label>
+      <input type="text" id="reporter-name" placeholder="Full name" oninput="saveReporterName()">
+    </div>
+    <div class="progress-bar">
+      <div class="stats" id="issues-stats"><b>0</b> issues ready to submit</div>
+      <button type="button" class="go" id="submit-btn" onclick="submitAllIssues()" disabled>Submit</button>
+    </div>
+  </div>
+
+  <!-- ============ DONE ============ -->
+  <div class="screen" id="screen-done">
+    <div class="brand-header">
+      <div class="brand-row">
+        <div class="brand-text"><div class="app-name">VESTA Repairs</div></div>
+      </div>
+    </div>
+    <div class="center-box">
+      <div class="icon">✅</div>
+      <h1 id="done-title">Reported</h1>
+      <p class="sub" id="done-sub"></p>
+      <button type="button" class="btn btn-primary" onclick="reportAnotherSameUnit()">Report another issue here</button>
+      <button type="button" class="btn btn-secondary" onclick="showScreen('screen-units')">Different apartment / area</button>
+      <button type="button" class="btn btn-ghost" onclick="showScreen('screen-buildings')">Different building</button>
+    </div>
+  </div>
+
+  <!-- ============ EXPORT: pick building ============ -->
+  <div class="screen" id="screen-export-buildings">
+    <div class="brand-header">
+      <div class="brand-row">
+        <button type="button" class="back-icon" onclick="showScreen('screen-buildings')">←</button>
+        <div class="brand-text"><div class="app-name">Export for Contractor</div></div>
+      </div>
+      <div class="app-sub">Select a building</div>
+    </div>
+    <div class="screen-pad">
+      <p class="sub">Pick the building whose open repair issues you want to send to the contractor as a PDF.</p>
+      <input type="text" class="search-box" id="exp-bld-search" placeholder="Search buildings..." oninput="renderExportBuildingList()">
+      <div id="exp-bld-list"></div>
+    </div>
+  </div>
+
+  <!-- ============ EXPORT: review + generate ============ -->
+  <div class="screen" id="screen-export-review">
+    <div class="brand-header">
+      <div class="brand-row">
+        <button type="button" class="back-icon" onclick="showScreen('screen-export-buildings')">←</button>
+        <div class="brand-text"><div class="app-name" id="exp-bld-name"></div></div>
+      </div>
+      <div class="app-sub">Open repair issues</div>
+    </div>
+    <div class="screen-pad">
+      <div id="exp-loading" class="center-box" style="padding:30px 0;"><div class="spinner"></div></div>
+      <div id="exp-list"></div>
+      <p class="sub" id="exp-empty-note" style="display:none;">No open (not-Done) repair issues found for this building.</p>
+    </div>
+    <div class="progress-bar" id="exp-progress-bar" style="display:none;">
+      <div class="stats" id="exp-stats"><b>0</b> selected</div>
+      <button type="button" class="go" id="exp-generate-btn" onclick="generateContractorPdf()">Generate PDF</button>
+    </div>
+  </div>
+
+</div>
+<script>
+/* ============ CONFIG / CONSTANTS ============ */
+const MONDAY_TOKEN = "eyJhbGciOiJIUzI1NiJ9.eyJ0aWQiOjYzODAzNTMwOSwiYWFpIjoxMSwidWlkIjo2OTQ3MzQxMCwiaWFkIjoiMjAyNi0wMy0yNlQwOTozMDoyNC4wMDBaIiwicGVyIjoibWU6d3JpdGUiLCJhY3RpZCI6MjQyNDkyOTMsInJnbiI6ImV1YzEifQ.lRfb3yhcBlKPl1sz71YP8M39uIwl_103FQwW5-fhE60";
+const MONDAY_FILE_RELAY = 'https://little-poetry-f71b.tomerg1992.workers.dev/';
+const APP_VERSION = "2026-09-05.1";
+
+const BOARD_REPAIRS = 5103597278;
+const BOARD_PROJECTS = 1667314838;
+const BOARD_APARTMENTS = 1667372413;
+// Groups on the PROJECTS board that count as "in execution or delivered" (excludes PENDING/CANCELED/etc.)
+const PROJECT_GROUPS = ["topics", "new_group_mkkbfq86"]; // "ON GOING", "DELIVERED"
+const PROJECT_COL = {
+  manager: "people__1",       // "Project Manager" people column
+  contractor: "connect_boards2__1" // "Contractor" board_relation -> Suppliers board
+};
+// The "Project" board_relation column on APARTMENTS DATABASE is not populated on existing items
+// (a known gap, confirmed while building the sibling VESTA Deliveries app), so apartments are
+// matched to their building by name instead: apartment items are named "<PROJECT NAME> - <UNIT CODE>".
+function projectKeyOf(name){
+  return (name||'').trim().split(/\s*-\s*/)[0].split(',')[0].trim().toUpperCase();
+}
+
+const REPAIR_COL = {
+  building: "board_relation_mm6xrpe6",
+  location: "text_mm6xvmxa",
+  category: "color_mm6xnqka",
+  description: "long_text_mm6xnwyn",
+  photo: "file_mm6xmrxy",
+  reportedBy: "text_mm6xq30m",
+  manager: "multiple_person_mm6xk668",
+  status: "color_mm6xmk13",
+  sentToContractor: "boolean_mm6xx02s"
+};
+
+const CATEGORIES = ["Plumbing","Electrical","Paint","Flooring & Walls","Furniture","Appliances","Doors/Windows/Locks","HVAC/AC","Other"];
+const COMMON_AREAS = ["Roof","Basement","Entrance/Lobby","Corridor","Facade","Elevator","Parking/Garage","Stairwell","Other"];
+
+const LOGO_DATA_URI = "data:image/png;base64,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";
+function applyLogo(){
+  if(!LOGO_DATA_URI) return;
+  document.querySelectorAll('.brand-logo').forEach(el=>{ el.innerHTML = `<img src="${LOGO_DATA_URI}" alt="VESTA">`; });
+}
+function escapeHtml(s){ return (s||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+/* ============ STATE ============ */
+let buildings = [];          // {id, name}
+let apartments = [];         // {id, name, projectKey}
+let apartmentsLoaded = false;
+let currentBuilding = null;   // {id, name}
+let currentLocation = null;   // {label, isApartment}
+let issues = [];              // {localId, category, description, photoFile, photoPreviewUrl, status, error}
+let issueLocalIdSeq = 1;
+const buildingInfoCache = new Map(); // buildingId -> {managerId, managerName, contractorName}
+let exportBuildingId = null;
+let exportItems = [];         // full repair items for the export screen
+
+/* ============ SCREEN NAV / TOAST ============ */
+function showScreen(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  window.scrollTo(0,0);
+}
+let toastTimer=null;
+function toast(msg, durationMs){
+  let el = document.getElementById('toast-el');
+  if(!el){ el = document.createElement('div'); el.id='toast-el'; el.className='toast'; document.body.appendChild(el); }
+  el.textContent = msg;
+  el.style.display='block';
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=>{ el.style.display='none'; }, durationMs || 3500);
+}
+
+/* ============ NETWORK HELPERS ============ */
+async function fetchWithTimeout(url, options, timeoutMs){
+  const controller = new AbortController();
+  const timer = setTimeout(()=>controller.abort(), timeoutMs);
+  try{
+    return await fetch(url, {...options, signal: controller.signal});
+  }catch(e){
+    if(e.name === 'AbortError'){
+      throw new Error(`Network request timed out after ${Math.round(timeoutMs/1000)}s — check your connection`);
+    }
+    throw e;
+  }finally{
+    clearTimeout(timer);
+  }
+}
+async function parseJsonResponse(res){
+  const text = await res.text();
+  try{ return JSON.parse(text); }
+  catch(e){ throw new Error(`Unexpected response (HTTP ${res.status}): ${(text||'').slice(0,200) || 'empty body'}`); }
+}
+async function mondayApi(query, variables){
+  const res = await fetchWithTimeout('https://api.monday.com/v2', {
+    method:'POST',
+    headers:{ 'Content-Type':'application/json', 'Authorization': MONDAY_TOKEN, 'API-Version':'2023-10' },
+    body: JSON.stringify({query, variables})
+  }, 20000);
+  const json = await parseJsonResponse(res);
+  if(json.errors){ throw new Error(json.errors.map(e=>e.message).join('; ')); }
+  return json.data;
+}
+async function mondayFileUpload(query, itemId, columnId, file){
+  const form = new FormData();
+  form.append('query', query);
+  form.append('variables[item_id]', itemId);
+  form.append('variables[column_id]', columnId);
+  form.append('variables[file]', file, file.name || 'photo.jpg');
+  const res = await fetchWithTimeout(MONDAY_FILE_RELAY, {
+    method:'POST', headers:{ 'Authorization': MONDAY_TOKEN }, body: form
+  }, 60000);
+  const json = await parseJsonResponse(res);
+  if(json.errors){ throw new Error(json.errors.map(e=>e.message).join('; ')); }
+  return json.data;
+}
+
+/* ============ BOOT ============ */
+function loadConfig(){
+  applyLogo();
+  const verEl = document.getElementById('app-version-note');
+  if(verEl) verEl.textContent = 'App version ' + APP_VERSION;
+  try{
+    const savedName = localStorage.getItem('repairs_reporter_name');
+    if(savedName){ const el = document.getElementById('reporter-name'); if(el) el.value = savedName; }
+  }catch(e){ /* localStorage can be unavailable (private browsing, etc.) — not fatal */ }
+  renderCommonAreaChips();
+  renderCategoryButtons();
+  loadBuildings();
+}
+function saveReporterName(){
+  try{ localStorage.setItem('repairs_reporter_name', document.getElementById('reporter-name').value.trim()); }
+  catch(e){ /* localStorage can be unavailable (private browsing, etc.) — not fatal */ }
+}
+
+/* ============ BUILDINGS ============ */
+async function loadBuildings(){
+  document.getElementById('bld-loading').style.display = 'block';
+  try{
+    buildings = await fetchBuildings();
+  }catch(e){
+    toast('Failed to load buildings: ' + e.message, 8000);
+  }
+  document.getElementById('bld-loading').style.display = 'none';
+  renderBuildingList();
+}
+async function fetchBuildings(){
+  const q = `query{
+    boards(ids:[${BOARD_PROJECTS}]){
+      groups(ids:${JSON.stringify(PROJECT_GROUPS)}){
+        items_page(limit:200){ items{ id name } }
+      }
+    }
+  }`;
+  const data = await mondayApi(q);
+  const out = [];
+  for(const g of data.boards[0].groups){
+    for(const it of g.items_page.items){ out.push({id: it.id, name: it.name}); }
+  }
+  out.sort((a,b)=>a.name.localeCompare(b.name));
+  return out;
+}
+function renderBuildingList(){
+  const term = document.getElementById('bld-search').value.trim().toLowerCase();
+  const list = document.getElementById('bld-list');
+  const filtered = term ? buildings.filter(b=>b.name.toLowerCase().includes(term)) : buildings;
+  if(filtered.length===0){
+    list.innerHTML = buildings.length===0 ? '' : '<p class="sub">No matches.</p>';
+    return;
+  }
+  list.innerHTML = filtered.map(b=>`
+    <div class="list-card" onclick="selectBuilding('${b.id}')">
+      <div class="name">${escapeHtml(b.name)}</div>
+    </div>
+  `).join('');
+}
+async function selectBuilding(id){
+  const b = buildings.find(x=>String(x.id)===String(id));
+  if(!b) return;
+  currentBuilding = b;
+  document.getElementById('units-bld-name').textContent = b.name;
+  showScreen('screen-units');
+  if(!apartmentsLoaded){
+    try{
+      apartments = await fetchAllApartments();
+      apartmentsLoaded = true;
+    }catch(e){
+      toast('Failed to load apartments: ' + e.message, 8000);
+    }
+  }
+  renderApartmentList();
+}
+
+/* ============ APARTMENTS ============ */
+async function fetchAllApartments(){
+  let results = [];
+  let cursor = null;
+  do{
+    const q = `query($cursor:String){
+      boards(ids:[${BOARD_APARTMENTS}]){
+        items_page(limit:500, cursor:$cursor){
+          cursor
+          items{ id name }
+        }
+      }
+    }`;
+    const data = await mondayApi(q, {cursor});
+    const page = data.boards[0].items_page;
+    for(const it of page.items){
+      results.push({id: it.id, name: it.name, projectKey: projectKeyOf(it.name)});
+    }
+    cursor = page.cursor;
+  } while(cursor);
+  return results;
+}
+function renderApartmentList(){
+  const term = document.getElementById('apt-search').value.trim().toLowerCase();
+  const list = document.getElementById('apt-list');
+  const key = projectKeyOf(currentBuilding.name);
+  let inProject = apartments.filter(a=>a.projectKey === key);
+  document.getElementById('apt-empty-note').style.display = inProject.length===0 ? 'block' : 'none';
+  const filtered = (term ? inProject.filter(a=>a.name.toLowerCase().includes(term)) : inProject).slice(0,200);
+  list.innerHTML = filtered.map(a=>`
+    <div class="list-card" onclick="selectLocation('${escapeHtml(a.name)}', true)">
+      <div class="name">${escapeHtml(a.name)}</div>
+    </div>
+  `).join('');
+}
+function renderCommonAreaChips(){
+  document.getElementById('common-area-list').innerHTML = COMMON_AREAS.map(a=>`
+    <button type="button" class="area-chip" onclick="selectLocation('${escapeHtml(a)}', false)">${escapeHtml(a)}</button>
+  `).join('');
+}
+function selectLocation(label, isApartment){
+  currentLocation = { label, isApartment };
+  issues = [];
+  document.getElementById('issues-location-name').textContent = label;
+  document.getElementById('issues-bld-name').textContent = currentBuilding.name;
+  resetIssueForm();
+  renderIssueList();
+  showScreen('screen-issues');
+}
+function reportAnotherSameUnit(){
+  issues = [];
+  resetIssueForm();
+  renderIssueList();
+  showScreen('screen-issues');
+}
+
+/* ============ ISSUE FORM ============ */
+let selectedCategory = null;
+let pendingPhotoFile = null;
+let pendingPhotoPreviewUrl = null;
+function renderCategoryButtons(){
+  document.getElementById('cat-grid').innerHTML = CATEGORIES.map(c=>`
+    <button type="button" class="cat-btn" data-cat="${escapeHtml(c)}" onclick="selectCategory('${escapeHtml(c)}')">${escapeHtml(c)}</button>
+  `).join('');
+}
+function selectCategory(cat){
+  selectedCategory = cat;
+  document.querySelectorAll('#cat-grid .cat-btn').forEach(b=>b.classList.toggle('sel', b.dataset.cat===cat));
+}
+function handleIssuePhoto(input){
+  const file = input.files && input.files[0];
+  if(!file) return;
+  pendingPhotoFile = file;
+  pendingPhotoPreviewUrl = URL.createObjectURL(file);
+  const btn = document.getElementById('issue-photo-btn');
+  btn.textContent = '📷 Photo added — tap to replace';
+  btn.classList.add('has-photo');
+  const prev = document.getElementById('issue-photo-preview');
+  prev.style.display='block';
+  prev.innerHTML = `<img src="${pendingPhotoPreviewUrl}">`;
+}
+function resetIssueForm(){
+  selectedCategory = null;
+  pendingPhotoFile = null;
+  pendingPhotoPreviewUrl = null;
+  document.querySelectorAll('#cat-grid .cat-btn').forEach(b=>b.classList.remove('sel'));
+  document.getElementById('issue-desc').value = '';
+  document.getElementById('issue-photo-input').value = '';
+  const btn = document.getElementById('issue-photo-btn');
+  btn.textContent = '📷 Add a required photo';
+  btn.classList.remove('has-photo');
+  document.getElementById('issue-photo-preview').style.display='none';
+  document.getElementById('issue-photo-preview').innerHTML = '';
+  document.getElementById('issue-form-error').textContent = '';
+}
+function addIssueToList(){
+  const err = document.getElementById('issue-form-error');
+  const description = document.getElementById('issue-desc').value.trim();
+  if(!selectedCategory){ err.textContent = 'Pick an issue category.'; return; }
+  if(!description){ err.textContent = 'Describe the issue.'; return; }
+  if(!pendingPhotoFile){ err.textContent = 'A photo is required.'; return; }
+  err.textContent = '';
+  issues.push({
+    localId: issueLocalIdSeq++,
+    category: selectedCategory,
+    description,
+    photoFile: pendingPhotoFile,
+    photoPreviewUrl: pendingPhotoPreviewUrl,
+    status: 'draft', // draft | sending | sent | failed
+    error: null
+  });
+  resetIssueForm();
+  renderIssueList();
+}
+function removeIssue(localId){
+  issues = issues.filter(i=>i.localId !== localId);
+  renderIssueList();
+}
+function renderIssueList(){
+  const list = document.getElementById('issue-list');
+  document.getElementById('issue-count').textContent = issues.length;
+  document.getElementById('issue-list-empty').style.display = issues.length===0 ? 'block' : 'none';
+  list.innerHTML = issues.map(i=>{
+    let statusHtml = '';
+    if(i.status==='sending') statusHtml = '<div class="issue-status pending">Sending…</div>';
+    else if(i.status==='sent') statusHtml = '<div class="issue-status ok">✓ Sent</div>';
+    else if(i.status==='failed') statusHtml = `<div class="issue-status err">Failed: ${escapeHtml(i.error||'')}</div>`;
+    return `
+    <div class="issue-card ${i.status==='failed'?'failed':''}">
+      <img src="${i.photoPreviewUrl}">
+      <div class="body">
+        <div class="cat">${escapeHtml(i.category)}</div>
+        <div class="desc">${escapeHtml(i.description)}</div>
+        ${statusHtml}
+      </div>
+      ${i.status==='sent' ? '' : `<button type="button" class="remove" onclick="removeIssue(${i.localId})">×</button>`}
+    </div>`;
+  }).join('');
+  const readyCount = issues.filter(i=>i.status!=='sent').length;
+  document.getElementById('issues-stats').innerHTML = `<b>${readyCount}</b> issue${readyCount===1?'':'s'} ready to submit`;
+  document.getElementById('submit-btn').disabled = readyCount===0;
+}
+
+/* ============ SUBMIT ============ */
+async function getBuildingInfo(buildingId){
+  if(buildingInfoCache.has(buildingId)) return buildingInfoCache.get(buildingId);
+  const q = `query($ids:[ID!]){
+    items(ids:$ids){
+      id
+      column_values(ids:["${PROJECT_COL.manager}","${PROJECT_COL.contractor}"]){
+        id
+        ... on PeopleValue { persons_and_teams { id kind } }
+        ... on BoardRelationValue { display_value }
+      }
+    }
+  }`;
+  const data = await mondayApi(q, {ids:[buildingId]});
+  const item = data.items[0];
+  let managerId = null, managerName = '', contractorName = '';
+  for(const cv of (item.column_values||[])){
+    if(cv.id === PROJECT_COL.manager && cv.persons_and_teams && cv.persons_and_teams.length){
+      const person = cv.persons_and_teams.find(p=>p.kind==='person') || cv.persons_and_teams[0];
+      managerId = person.id;
+    }
+    if(cv.id === PROJECT_COL.contractor){
+      contractorName = cv.display_value || '';
+    }
+  }
+  const info = {managerId, managerName, contractorName};
+  buildingInfoCache.set(buildingId, info);
+  return info;
+}
+async function submitAllIssues(){
+  const reporterName = document.getElementById('reporter-name').value.trim();
+  if(!reporterName){ toast('Enter your name before submitting.'); return; }
+  saveReporterName();
+  const btn = document.getElementById('submit-btn');
+  btn.disabled = true;
+  btn.textContent = 'Submitting…';
+
+  let info;
+  try{
+    info = await getBuildingInfo(currentBuilding.id);
+  }catch(e){
+    toast('Could not load the Project Manager for this building: ' + e.message, 8000);
+    btn.disabled = false; btn.textContent = 'Submit';
+    return;
+  }
+
+  let anyFailed = false;
+  for(const issue of issues){
+    if(issue.status === 'sent') continue;
+    issue.status = 'sending'; issue.error = null;
+    renderIssueList();
+    try{
+      await submitOneIssue(issue, info, reporterName);
+      issue.status = 'sent';
+    }catch(e){
+      issue.status = 'failed';
+      issue.error = e.message;
+      anyFailed = true;
+    }
+    renderIssueList();
+  }
+
+  btn.textContent = 'Submit';
+  btn.disabled = issues.filter(i=>i.status!=='sent').length===0;
+
+  if(!anyFailed){
+    document.getElementById('done-title').textContent = 'Reported';
+    document.getElementById('done-sub').textContent = `${issues.length} issue${issues.length===1?'':'s'} logged for ${currentLocation.label}, ${currentBuilding.name}.`;
+    issues = [];
+    showScreen('screen-done');
+  } else {
+    toast('Some issues failed to send — check the list and tap Submit again to retry.', 8000);
+  }
+}
+async function submitOneIssue(issue, info, reporterName){
+  const columnValues = {
+    [REPAIR_COL.building]: {item_ids:[Number(currentBuilding.id)]},
+    [REPAIR_COL.location]: currentLocation.label,
+    [REPAIR_COL.category]: {label: issue.category},
+    [REPAIR_COL.description]: {text: issue.description},
+    [REPAIR_COL.reportedBy]: reporterName,
+    [REPAIR_COL.status]: {label: 'New'}
+  };
+  if(info.managerId){
+    columnValues[REPAIR_COL.manager] = {personsAndTeams:[{id:Number(info.managerId), kind:'person'}]};
+  }
+  const itemName = `${currentBuilding.name} — ${currentLocation.label} — ${issue.category}`;
+  const mutation = `mutation($boardId:ID!, $itemName:String!, $columnValues:JSON!){
+    create_item(board_id:$boardId, item_name:$itemName, column_values:$columnValues){ id }
+  }`;
+  const data = await mondayApi(mutation, {
+    boardId: BOARD_REPAIRS, itemName, columnValues: JSON.stringify(columnValues)
+  });
+  const itemId = data.create_item.id;
+
+  const uploadQuery = `mutation ($file: File!, $item_id: ID!, $column_id: String!) {
+    add_file_to_column (item_id: $item_id, column_id: $column_id, file: $file) { id }
+  }`;
+  await mondayFileUpload(uploadQuery, itemId, REPAIR_COL.photo, issue.photoFile);
+
+  if(info.managerId){
+    try{
+      const notifQuery = `mutation($userId:ID!, $targetId:ID!, $text:String!){
+        create_notification(user_id:$userId, target_id:$targetId, text:$text, target_type:Project){ id }
+      }`;
+      await mondayApi(notifQuery, {
+        userId: info.managerId, targetId: itemId,
+        text: `New repair reported at ${currentBuilding.name} — ${currentLocation.label} (${issue.category}) by ${reporterName}.`
+      });
+    }catch(e){ /* notification failure shouldn't block the report itself */ }
+  }
+}
+
+/* ============ EXPORT FOR CONTRACTOR ============ */
+function enterExport(){
+  exportBuildingId = null;
+  renderExportBuildingList();
+  showScreen('screen-export-buildings');
+}
+function renderExportBuildingList(){
+  const term = document.getElementById('exp-bld-search').value.trim().toLowerCase();
+  const list = document.getElementById('exp-bld-list');
+  const filtered = term ? buildings.filter(b=>b.name.toLowerCase().includes(term)) : buildings;
+  list.innerHTML = filtered.map(b=>`
+    <div class="list-card" onclick="selectExportBuilding('${b.id}')">
+      <div class="name">${escapeHtml(b.name)}</div>
+    </div>
+  `).join('');
+}
+async function selectExportBuilding(id){
+  const b = buildings.find(x=>String(x.id)===String(id));
+  if(!b) return;
+  exportBuildingId = b.id;
+  document.getElementById('exp-bld-name').textContent = b.name;
+  showScreen('screen-export-review');
+  document.getElementById('exp-loading').style.display='block';
+  document.getElementById('exp-list').innerHTML='';
+  document.getElementById('exp-progress-bar').style.display='none';
+  try{
+    exportItems = await fetchRepairsForBuilding(b.id);
+  }catch(e){
+    toast('Failed to load repair issues: ' + e.message, 8000);
+    exportItems = [];
+  }
+  document.getElementById('exp-loading').style.display='none';
+  renderExportList();
+}
+async function fetchRepairsForBuilding(buildingId){
+  let results = [];
+  let cursor = null;
+  const colIds = [REPAIR_COL.building, REPAIR_COL.location, REPAIR_COL.category, REPAIR_COL.description, REPAIR_COL.photo, REPAIR_COL.reportedBy, REPAIR_COL.status, REPAIR_COL.sentToContractor];
+  do{
+    const q = `query($cursor:String){
+      boards(ids:[${BOARD_REPAIRS}]){
+        items_page(limit:100, cursor:$cursor){
+          cursor
+          items{
+            id name created_at
+            column_values(ids:${JSON.stringify(colIds)}){
+              id text
+              ... on BoardRelationValue { linked_item_ids }
+              ... on StatusValue { label }
+              ... on FileValue { files { name asset { public_url } } }
+              ... on CheckboxValue { checked }
+              ... on LongTextValue { text }
+            }
+          }
+        }
+      }
+    }`;
+    const data = await mondayApi(q, {cursor});
+    const page = data.boards[0].items_page;
+    for(const it of page.items){
+      const cv = {};
+      for(const c of it.column_values){ cv[c.id] = c; }
+      const buildingRel = cv[REPAIR_COL.building];
+      const linkedIds = (buildingRel && buildingRel.linked_item_ids) || [];
+      if(!linkedIds.map(String).includes(String(buildingId))) continue;
+      const statusLabel = (cv[REPAIR_COL.status] && cv[REPAIR_COL.status].label) || '';
+      if(statusLabel === 'Done') continue;
+      const fileCol = cv[REPAIR_COL.photo];
+      const photoUrl = (fileCol && fileCol.files && fileCol.files[0] && fileCol.files[0].asset) ? fileCol.files[0].asset.public_url : null;
+      results.push({
+        id: it.id,
+        createdAt: it.created_at,
+        location: (cv[REPAIR_COL.location] && cv[REPAIR_COL.location].text) || '',
+        category: (cv[REPAIR_COL.category] && cv[REPAIR_COL.category].label) || '',
+        description: (cv[REPAIR_COL.description] && cv[REPAIR_COL.description].text) || '',
+        reportedBy: (cv[REPAIR_COL.reportedBy] && cv[REPAIR_COL.reportedBy].text) || '',
+        photoUrl,
+        alreadySent: !!(cv[REPAIR_COL.sentToContractor] && cv[REPAIR_COL.sentToContractor].checked)
+      });
+    }
+    cursor = page.cursor;
+  } while(cursor);
+  return results;
+}
+function renderExportList(){
+  const list = document.getElementById('exp-list');
+  document.getElementById('exp-empty-note').style.display = exportItems.length===0 ? 'block' : 'none';
+  document.getElementById('exp-progress-bar').style.display = exportItems.length===0 ? 'none' : 'flex';
+  list.innerHTML = exportItems.map(it=>`
+    <div class="export-row">
+      <input type="checkbox" id="exp-chk-${it.id}" ${it.alreadySent ? '' : 'checked'} onchange="updateExportStats()">
+      ${it.photoUrl ? `<img src="${it.photoUrl}">` : ''}
+      <div class="body">
+        <div class="cat">${escapeHtml(it.location)} — ${escapeHtml(it.category)}${it.alreadySent ? '<span class="sent-badge">already sent</span>' : ''}</div>
+        <div class="meta">${escapeHtml(it.reportedBy)} · ${new Date(it.createdAt).toLocaleDateString()}</div>
+        <div class="desc">${escapeHtml(it.description)}</div>
+      </div>
+    </div>
+  `).join('');
+  updateExportStats();
+}
+function updateExportStats(){
+  const n = exportItems.filter(it=>document.getElementById('exp-chk-'+it.id) && document.getElementById('exp-chk-'+it.id).checked).length;
+  document.getElementById('exp-stats').innerHTML = `<b>${n}</b> selected`;
+  document.getElementById('exp-generate-btn').disabled = n===0;
+}
+async function imageUrlToDataUrl(url){
+  const res = await fetchWithTimeout(url, {}, 20000);
+  if(!res.ok) throw new Error('HTTP '+res.status);
+  const blob = await res.blob();
+  return await new Promise((resolve,reject)=>{
+    const reader = new FileReader();
+    reader.onload = ()=>resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
+async function generateContractorPdf(){
+  const selected = exportItems.filter(it=>document.getElementById('exp-chk-'+it.id) && document.getElementById('exp-chk-'+it.id).checked);
+  if(selected.length===0) return;
+  const btn = document.getElementById('exp-generate-btn');
+  btn.disabled = true;
+  btn.textContent = 'Generating…';
+  try{
+    if(!window.jspdf || !window.jspdf.jsPDF){ throw new Error('PDF library failed to load — check your connection and try again.'); }
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({unit:'pt', format:'a4'});
+    const pageW = doc.internal.pageSize.getWidth();
+    const marginX = 40;
+    let y = 50;
+
+    doc.setFillColor(26,43,76);
+    doc.rect(0,0,pageW,80,'F');
+    doc.setTextColor(255,255,255);
+    doc.setFontSize(18);
+    doc.text('VESTA — Repair Issues for Contractor', marginX, 35);
+    doc.setFontSize(11);
+    doc.text(document.getElementById('exp-bld-name').textContent, marginX, 55);
+    doc.setFontSize(9);
+    doc.text('Generated ' + new Date().toLocaleString(), marginX, 70);
+    y = 105;
+    doc.setTextColor(35,40,58);
+
+    for(let idx=0; idx<selected.length; idx++){
+      const it = selected[idx];
+      const blockHeight = 190;
+      if(y + blockHeight > doc.internal.pageSize.getHeight() - 40){
+        doc.addPage();
+        y = 50;
+      }
+      doc.setDrawColor(217,220,230);
+      doc.setLineWidth(1);
+      doc.line(marginX, y, pageW-marginX, y);
+      y += 18;
+      doc.setFontSize(13);
+      doc.setFont(undefined, 'bold');
+      doc.text(`${idx+1}. ${it.location} — ${it.category}`, marginX, y);
+      doc.setFont(undefined, 'normal');
+      y += 16;
+      doc.setFontSize(9.5);
+      doc.setTextColor(103,104,121);
+      doc.text(`Reported by ${it.reportedBy || 'n/a'} on ${new Date(it.createdAt).toLocaleDateString()}`, marginX, y);
+      y += 16;
+      doc.setTextColor(35,40,58);
+      doc.setFontSize(10.5);
+      const descLines = doc.splitTextToSize(it.description || '(no description)', pageW - marginX*2 - 130);
+      doc.text(descLines, marginX, y);
+
+      if(it.photoUrl){
+        try{
+          const dataUrl = await imageUrlToDataUrl(it.photoUrl);
+          doc.addImage(dataUrl, 'JPEG', pageW - marginX - 110, y - 12, 110, 110);
+        }catch(e){
+          doc.setFontSize(9);
+          doc.setTextColor(226,68,92);
+          doc.text('(photo could not be loaded)', pageW - marginX - 110, y);
+          doc.setTextColor(35,40,58);
+        }
+      }
+      y += Math.max(descLines.length * 13, 110) + 20;
+    }
+
+    doc.save(`VESTA-Repairs-${document.getElementById('exp-bld-name').textContent.replace(/[^a-z0-9]+/gi,'-')}-${new Date().toISOString().slice(0,10)}.pdf`);
+
+    await Promise.all(selected.map(it => markSentToContractor(it.id).catch(()=>{})));
+    toast('PDF generated and downloaded.');
+  }catch(e){
+    toast('Failed to generate PDF: ' + e.message, 8000);
+  }
+  btn.textContent = 'Generate PDF';
+  btn.disabled = false;
+}
+async function markSentToContractor(itemId){
+  const mutation = `mutation($boardId:ID!, $itemId:ID!, $columnValues:JSON!){
+    change_multiple_column_values(board_id:$boardId, item_id:$itemId, column_values:$columnValues){ id }
+  }`;
+  await mondayApi(mutation, {
+    boardId: BOARD_REPAIRS, itemId,
+    columnValues: JSON.stringify({[REPAIR_COL.sentToContractor]: {checked:"true"}})
+  });
+}
+
+loadConfig();
+</script>
+</body>
+</html>
