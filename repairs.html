@@ -10,7 +10,6 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700&display=swap" rel="stylesheet">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="VESTA Repairs">
@@ -114,13 +113,11 @@
   .progress-bar .go:disabled{background:#aab3c5;}
 
   .export-row{border:1.5px solid var(--border);border-radius:12px;padding:12px;margin-bottom:10px;display:flex;gap:12px;align-items:flex-start;background:#fff;}
-  .export-row input[type=checkbox]{width:22px;height:22px;flex-shrink:0;margin-top:2px;}
   .export-row img{width:52px;height:52px;object-fit:cover;border-radius:8px;flex-shrink:0;}
   .export-row .body{flex:1;min-width:0;}
   .export-row .cat{font-weight:800;font-size:13px;color:var(--navy);}
   .export-row .meta{font-size:11.5px;color:var(--gray);margin-top:2px;}
   .export-row .desc{font-size:12.5px;color:var(--dark);margin-top:4px;}
-  .sent-badge{display:inline-block;background:#f2ede0;color:var(--gray);font-size:10.5px;font-weight:800;padding:2px 8px;border-radius:10px;margin-left:6px;}
 </style>
 </head>
 <body>
@@ -140,7 +137,6 @@
       <p class="sub">Report a new technical issue, or resolve one that's already open.</p>
       <button type="button" class="btn btn-primary" onclick="startReportMode()">🛠️ Report an Issue</button>
       <button type="button" class="btn btn-secondary" onclick="startResolveMode()">✅ Resolve an Open Issue</button>
-      <button type="button" class="link-btn" onclick="enterExport()">Export for Contractor →</button>
       <p class="footer-note" id="app-version-note"></p>
     </div>
   </div>
@@ -282,48 +278,13 @@
     </div>
   </div>
 
-  <!-- ============ EXPORT: pick building ============ -->
-  <div class="screen" id="screen-export-buildings">
-    <div class="brand-header">
-      <div class="brand-row">
-        <button type="button" class="back-icon" onclick="showScreen('screen-home')">←</button>
-        <div class="brand-text"><div class="app-name">Export for Contractor</div></div>
-      </div>
-      <div class="app-sub">Select a building</div>
-    </div>
-    <div class="screen-pad">
-      <p class="sub">Pick the building whose open repair issues you want to send to the contractor as a PDF.</p>
-      <input type="text" class="search-box" id="exp-bld-search" placeholder="Search buildings..." oninput="renderExportBuildingList()">
-      <div id="exp-bld-list"></div>
-    </div>
-  </div>
-
-  <!-- ============ EXPORT: review + generate ============ -->
-  <div class="screen" id="screen-export-review">
-    <div class="brand-header">
-      <div class="brand-row">
-        <button type="button" class="back-icon" onclick="showScreen('screen-export-buildings')">←</button>
-        <div class="brand-text"><div class="app-name" id="exp-bld-name"></div></div>
-      </div>
-      <div class="app-sub">Open repair issues</div>
-    </div>
-    <div class="screen-pad">
-      <div id="exp-loading" class="center-box" style="padding:30px 0;"><div class="spinner"></div></div>
-      <div id="exp-list"></div>
-      <p class="sub" id="exp-empty-note" style="display:none;">No open (not-Done) repair issues found for this building.</p>
-    </div>
-    <div class="progress-bar" id="exp-progress-bar" style="display:none;">
-      <div class="stats" id="exp-stats"><b>0</b> selected</div>
-      <button type="button" class="go" id="exp-generate-btn" onclick="generateContractorPdf()">Generate PDF</button>
-    </div>
-  </div>
 
 </div>
 <script>
 /* ============ CONFIG / CONSTANTS ============ */
 const MONDAY_TOKEN = "eyJhbGciOiJIUzI1NiJ9.eyJ0aWQiOjYzODAzNTMwOSwiYWFpIjoxMSwidWlkIjo2OTQ3MzQxMCwiaWFkIjoiMjAyNi0wMy0yNlQwOTozMDoyNC4wMDBaIiwicGVyIjoibWU6d3JpdGUiLCJhY3RpZCI6MjQyNDkyOTMsInJnbiI6ImV1YzEifQ.lRfb3yhcBlKPl1sz71YP8M39uIwl_103FQwW5-fhE60";
 const MONDAY_FILE_RELAY = 'https://little-poetry-f71b.tomerg1992.workers.dev/';
-const APP_VERSION = "2026-09-05.1";
+const APP_VERSION = "2026-09-15.1";
 
 const BOARD_REPAIRS = 5103597278;
 const BOARD_PROJECTS = 1667314838;
@@ -351,7 +312,6 @@ const REPAIR_COL = {
   manager: "multiple_person_mm6xk668",
   status: "color_mm6xmk13",
   sentToContractor: "boolean_mm6xx02s",
-  exportPdf: "file_mm6xk16s",
   resolutionPhoto: "file_mm6xhxss",
   resolutionNotes: "long_text_mm6xmgmw",
   resolvedBy: "text_mm6x3qth",
@@ -382,8 +342,6 @@ let currentLocation = null;   // {label, isApartment}
 let issues = [];              // {localId, category, description, photoFile, photoPreviewUrl, status, error}
 let issueLocalIdSeq = 1;
 const buildingInfoCache = new Map(); // buildingId -> {managerId, managerName, contractorName}
-let exportBuildingId = null;
-let exportItems = [];         // full repair items for the export screen
 
 let appMode = 'report';       // 'report' | 'resolve' — which flow screen-buildings feeds into
 let resolveItems = [];        // open repair items for the building being resolved
@@ -805,40 +763,11 @@ async function submitOneIssue(issue, info, reporterName){
   }
 }
 
-/* ============ EXPORT FOR CONTRACTOR ============ */
-function enterExport(){
-  exportBuildingId = null;
-  renderExportBuildingList();
-  showScreen('screen-export-buildings');
-}
-function renderExportBuildingList(){
-  const term = document.getElementById('exp-bld-search').value.trim().toLowerCase();
-  const list = document.getElementById('exp-bld-list');
-  const filtered = term ? buildings.filter(b=>b.name.toLowerCase().includes(term)) : buildings;
-  list.innerHTML = filtered.map(b=>`
-    <div class="list-card" onclick="selectExportBuilding('${b.id}')">
-      <div class="name">${escapeHtml(b.name)}</div>
-    </div>
-  `).join('');
-}
-async function selectExportBuilding(id){
-  const b = buildings.find(x=>String(x.id)===String(id));
-  if(!b) return;
-  exportBuildingId = b.id;
-  document.getElementById('exp-bld-name').textContent = b.name;
-  showScreen('screen-export-review');
-  document.getElementById('exp-loading').style.display='block';
-  document.getElementById('exp-list').innerHTML='';
-  document.getElementById('exp-progress-bar').style.display='none';
-  try{
-    exportItems = await fetchRepairsForBuilding(b.id);
-  }catch(e){
-    toast('Failed to load repair issues: ' + e.message, 8000);
-    exportItems = [];
-  }
-  document.getElementById('exp-loading').style.display='none';
-  renderExportList();
-}
+/* ============ SHARED: fetch a building's open repair issues ============ */
+// Used by the Resolve flow. Export-for-contractor now happens entirely from
+// Monday itself (tick "Sent to Contractor" on issues, then the trigger
+// checkbox in the REPAIRS board's "Export Controls" group) — see the
+// little-poetry-f71b Cloudflare Worker for that logic.
 async function fetchRepairsForBuilding(buildingId){
   let results = [];
   let cursor = null;
@@ -891,154 +820,6 @@ async function fetchRepairsForBuilding(buildingId){
   } while(cursor);
   return results;
 }
-function renderExportList(){
-  const list = document.getElementById('exp-list');
-  document.getElementById('exp-empty-note').style.display = exportItems.length===0 ? 'block' : 'none';
-  document.getElementById('exp-progress-bar').style.display = exportItems.length===0 ? 'none' : 'flex';
-  list.innerHTML = exportItems.map(it=>`
-    <div class="export-row">
-      <input type="checkbox" id="exp-chk-${it.id}" ${it.alreadySent ? '' : 'checked'} onchange="updateExportStats()">
-      ${it.photoUrl ? `<img src="${it.photoUrl}">` : ''}
-      <div class="body">
-        <div class="cat">${escapeHtml(it.location)} — ${escapeHtml(it.category)}${it.alreadySent ? '<span class="sent-badge">already sent</span>' : ''}</div>
-        <div class="meta">${escapeHtml(it.reportedBy)} · ${new Date(it.createdAt).toLocaleDateString()}</div>
-        <div class="desc">${escapeHtml(it.description)}</div>
-      </div>
-    </div>
-  `).join('');
-  updateExportStats();
-}
-function updateExportStats(){
-  const n = exportItems.filter(it=>document.getElementById('exp-chk-'+it.id) && document.getElementById('exp-chk-'+it.id).checked).length;
-  document.getElementById('exp-stats').innerHTML = `<b>${n}</b> selected`;
-  document.getElementById('exp-generate-btn').disabled = n===0;
-}
-async function imageUrlToDataUrl(url){
-  const res = await fetchWithTimeout(url, {}, 20000);
-  if(!res.ok) throw new Error('HTTP '+res.status);
-  const blob = await res.blob();
-  return await new Promise((resolve,reject)=>{
-    const reader = new FileReader();
-    reader.onload = ()=>resolve(reader.result);
-    reader.onerror = reject;
-    reader.readAsDataURL(blob);
-  });
-}
-async function generateContractorPdf(){
-  const selected = exportItems.filter(it=>document.getElementById('exp-chk-'+it.id) && document.getElementById('exp-chk-'+it.id).checked);
-  if(selected.length===0) return;
-  const btn = document.getElementById('exp-generate-btn');
-  btn.disabled = true;
-  btn.textContent = 'Generating…';
-  try{
-    if(!window.jspdf || !window.jspdf.jsPDF){ throw new Error('PDF library failed to load — check your connection and try again.'); }
-    const { jsPDF } = window.jspdf;
-    const doc = new jsPDF({unit:'pt', format:'a4'});
-    const pageW = doc.internal.pageSize.getWidth();
-    const marginX = 40;
-    let y = 50;
-
-    doc.setFillColor(26,43,76);
-    doc.rect(0,0,pageW,80,'F');
-    doc.setTextColor(255,255,255);
-    doc.setFontSize(18);
-    doc.text('VESTA — Repair Issues for Contractor', marginX, 35);
-    doc.setFontSize(11);
-    doc.text(document.getElementById('exp-bld-name').textContent, marginX, 55);
-    doc.setFontSize(9);
-    doc.text('Generated ' + new Date().toLocaleString(), marginX, 70);
-    y = 105;
-    doc.setTextColor(35,40,58);
-
-    for(let idx=0; idx<selected.length; idx++){
-      const it = selected[idx];
-      const blockHeight = 190;
-      if(y + blockHeight > doc.internal.pageSize.getHeight() - 40){
-        doc.addPage();
-        y = 50;
-      }
-      doc.setDrawColor(217,220,230);
-      doc.setLineWidth(1);
-      doc.line(marginX, y, pageW-marginX, y);
-      y += 18;
-      doc.setFontSize(13);
-      doc.setFont(undefined, 'bold');
-      doc.text(`${idx+1}. ${it.location} — ${it.category}`, marginX, y);
-      doc.setFont(undefined, 'normal');
-      y += 16;
-      doc.setFontSize(9.5);
-      doc.setTextColor(103,104,121);
-      doc.text(`Reported by ${it.reportedBy || 'n/a'} on ${new Date(it.createdAt).toLocaleDateString()}`, marginX, y);
-      y += 16;
-      doc.setTextColor(35,40,58);
-      doc.setFontSize(10.5);
-      const descLines = doc.splitTextToSize(it.description || '(no description)', pageW - marginX*2 - 130);
-      doc.text(descLines, marginX, y);
-
-      if(it.photoUrl){
-        try{
-          const dataUrl = await imageUrlToDataUrl(it.photoUrl);
-          doc.addImage(dataUrl, 'JPEG', pageW - marginX - 110, y - 12, 110, 110);
-        }catch(e){
-          doc.setFontSize(9);
-          doc.setTextColor(226,68,92);
-          doc.text('(photo could not be loaded)', pageW - marginX - 110, y);
-          doc.setTextColor(35,40,58);
-        }
-      }
-      y += Math.max(descLines.length * 13, 110) + 20;
-    }
-
-    const bldName = document.getElementById('exp-bld-name').textContent;
-    const dateStr = new Date().toISOString().slice(0,10);
-    const fileBaseName = `VESTA-Repairs-${bldName.replace(/[^a-z0-9]+/gi,'-')}-${dateStr}`;
-    doc.save(`${fileBaseName}.pdf`);
-
-    await Promise.all(selected.map(it => markSentToContractor(it.id).catch(()=>{})));
-
-    try{
-      await uploadExportPdfToMonday(doc, bldName, dateStr, fileBaseName, selected);
-      toast('PDF downloaded, and attached to a new item in the REPAIRS board\'s "Contractor Exports" group.');
-    }catch(e){
-      toast('PDF downloaded, but could not be attached inside Monday: ' + e.message, 8000);
-    }
-  }catch(e){
-    toast('Failed to generate PDF: ' + e.message, 8000);
-  }
-  btn.textContent = 'Generate PDF';
-  btn.disabled = false;
-}
-async function uploadExportPdfToMonday(doc, bldName, dateStr, fileBaseName, selected){
-  const pdfBlob = doc.output('blob');
-  const pdfFile = new File([pdfBlob], `${fileBaseName}.pdf`, {type:'application/pdf'});
-  const summaryLines = selected.map(it => `• ${it.location} — ${it.category} (${it.reportedBy || 'n/a'})`).join('\n');
-  const columnValues = {
-    [REPAIR_COL.building]: {item_ids:[Number(exportBuildingId)]},
-    [REPAIR_COL.description]: {text: `Contractor export generated ${new Date().toLocaleString()}, covering ${selected.length} issue${selected.length===1?'':'s'}:\n${summaryLines}`}
-  };
-  const mutation = `mutation($boardId:ID!, $groupId:String!, $itemName:String!, $columnValues:JSON!){
-    create_item(board_id:$boardId, group_id:$groupId, item_name:$itemName, column_values:$columnValues){ id }
-  }`;
-  const data = await mondayApi(mutation, {
-    boardId: BOARD_REPAIRS, groupId: REPAIRS_EXPORTS_GROUP,
-    itemName: `${bldName} — Export ${dateStr}`, columnValues: JSON.stringify(columnValues)
-  });
-  const itemId = data.create_item.id;
-  const uploadQuery = `mutation ($file: File!, $item_id: ID!, $column_id: String!) {
-    add_file_to_column (item_id: $item_id, column_id: $column_id, file: $file) { id }
-  }`;
-  await mondayFileUpload(uploadQuery, itemId, REPAIR_COL.exportPdf, pdfFile);
-}
-async function markSentToContractor(itemId){
-  const mutation = `mutation($boardId:ID!, $itemId:ID!, $columnValues:JSON!){
-    change_multiple_column_values(board_id:$boardId, item_id:$itemId, column_values:$columnValues){ id }
-  }`;
-  await mondayApi(mutation, {
-    boardId: BOARD_REPAIRS, itemId,
-    columnValues: JSON.stringify({[REPAIR_COL.sentToContractor]: {checked:"true"}})
-  });
-}
-
 /* ============ RESOLVE AN OPEN ISSUE ============ */
 async function enterResolveList(building){
   document.getElementById('resolve-bld-name').textContent = building.name;
