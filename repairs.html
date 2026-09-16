@@ -81,8 +81,10 @@
 
   .photo-btn{display:inline-flex;align-items:center;gap:6px;background:#fff;border:1.5px dashed var(--border);border-radius:8px;padding:11px 14px;font-size:13.5px;font-weight:700;color:var(--gray);width:100%;justify-content:center;margin-top:14px;}
   .photo-btn.has-photo{border-style:solid;border-color:var(--green);color:var(--green);}
-  .photo-preview{margin-top:10px;text-align:center;}
-  .photo-preview img{max-width:100%;max-height:220px;border-radius:10px;border:1px solid var(--border);}
+  .photo-preview{margin-top:10px;display:flex;gap:10px;flex-wrap:wrap;justify-content:center;}
+  .photo-preview .photo-thumb{position:relative;}
+  .photo-preview img{max-width:150px;max-height:150px;border-radius:10px;border:1px solid var(--border);display:block;}
+  .photo-preview .photo-thumb .rm{position:absolute;top:-8px;right:-8px;width:24px;height:24px;border-radius:50%;background:var(--red);color:#fff;border:2px solid #fff;font-size:14px;font-weight:800;line-height:1;padding:0;display:flex;align-items:center;justify-content:center;}
 
   .issue-card{border:1.5px solid var(--border);border-radius:12px;padding:12px;margin-bottom:10px;display:flex;gap:12px;background:#fff;}
   .issue-card img{width:56px;height:56px;object-fit:cover;border-radius:8px;flex-shrink:0;}
@@ -241,7 +243,7 @@
         <textarea id="issue-desc" placeholder="What's wrong, exactly where, etc."></textarea>
 
         <input type="file" accept="image/*" capture="environment" id="issue-photo-input" style="display:none;" onchange="handleIssuePhoto(this)">
-        <button type="button" class="photo-btn" id="issue-photo-btn" onclick="document.getElementById('issue-photo-input').click()">📷 Add a required photo</button>
+        <button type="button" class="photo-btn" id="issue-photo-btn" onclick="document.getElementById('issue-photo-input').click()">📷 Add a required photo (up to 2)</button>
         <div class="photo-preview" id="issue-photo-preview" style="display:none;"></div>
 
         <button type="button" class="btn btn-secondary" onclick="addIssueToList()">+ Add this issue</button>
@@ -284,7 +286,7 @@
 /* ============ CONFIG / CONSTANTS ============ */
 const MONDAY_TOKEN = "eyJhbGciOiJIUzI1NiJ9.eyJ0aWQiOjYzODAzNTMwOSwiYWFpIjoxMSwidWlkIjo2OTQ3MzQxMCwiaWFkIjoiMjAyNi0wMy0yNlQwOTozMDoyNC4wMDBaIiwicGVyIjoibWU6d3JpdGUiLCJhY3RpZCI6MjQyNDkyOTMsInJnbiI6ImV1YzEifQ.lRfb3yhcBlKPl1sz71YP8M39uIwl_103FQwW5-fhE60";
 const MONDAY_FILE_RELAY = 'https://little-poetry-f71b.tomerg1992.workers.dev/';
-const APP_VERSION = "2026-09-15.1";
+const APP_VERSION = "2026-09-16.1";
 
 const BOARD_REPAIRS = 5103597278;
 const BOARD_PROJECTS = 1667314838;
@@ -564,9 +566,9 @@ function reportAnotherSameUnit(){
 }
 
 /* ============ ISSUE FORM ============ */
+const MAX_PHOTOS_PER_ISSUE = 2;
 let selectedCategory = null;
-let pendingPhotoFile = null;
-let pendingPhotoPreviewUrl = null;
+let pendingPhotos = []; // {file, previewUrl}[]
 function renderCategoryButtons(){
   document.getElementById('cat-grid').innerHTML = CATEGORIES.map(c=>`
     <button type="button" class="cat-btn" data-cat="${escapeHtml(c)}" onclick="selectCategory('${escapeHtml(c)}')">${CATEGORY_ICONS[c]||''} ${escapeHtml(c)}</button>
@@ -578,28 +580,44 @@ function selectCategory(cat){
 }
 function handleIssuePhoto(input){
   const file = input.files && input.files[0];
+  input.value = ''; // allow picking the same file again later
   if(!file) return;
-  pendingPhotoFile = file;
-  pendingPhotoPreviewUrl = URL.createObjectURL(file);
+  if(pendingPhotos.length >= MAX_PHOTOS_PER_ISSUE){ return; }
+  pendingPhotos.push({ file, previewUrl: URL.createObjectURL(file) });
+  renderPendingPhotos();
+}
+function removePendingPhoto(idx){
+  pendingPhotos.splice(idx, 1);
+  renderPendingPhotos();
+}
+function renderPendingPhotos(){
   const btn = document.getElementById('issue-photo-btn');
-  btn.textContent = '📷 Photo added — tap to replace';
-  btn.classList.add('has-photo');
   const prev = document.getElementById('issue-photo-preview');
-  prev.style.display='block';
-  prev.innerHTML = `<img src="${pendingPhotoPreviewUrl}">`;
+  const n = pendingPhotos.length;
+  if(n === 0){
+    btn.textContent = '📷 Add a required photo (up to ' + MAX_PHOTOS_PER_ISSUE + ')';
+    btn.classList.remove('has-photo');
+  } else {
+    btn.textContent = n < MAX_PHOTOS_PER_ISSUE ? `📷 Add another photo (${n}/${MAX_PHOTOS_PER_ISSUE})` : `📷 ${n}/${MAX_PHOTOS_PER_ISSUE} photos added`;
+    btn.classList.add('has-photo');
+  }
+  btn.disabled = n >= MAX_PHOTOS_PER_ISSUE;
+  prev.style.display = n === 0 ? 'none' : 'flex';
+  prev.innerHTML = pendingPhotos.map((p, idx) => `
+    <div class="photo-thumb">
+      <img src="${p.previewUrl}">
+      <button type="button" class="rm" onclick="removePendingPhoto(${idx})">×</button>
+    </div>
+  `).join('');
 }
 function resetIssueForm(){
   selectedCategory = null;
-  pendingPhotoFile = null;
-  pendingPhotoPreviewUrl = null;
+  pendingPhotos = [];
   document.querySelectorAll('#cat-grid .cat-btn').forEach(b=>b.classList.remove('sel'));
   document.getElementById('issue-desc').value = '';
   document.getElementById('issue-photo-input').value = '';
-  const btn = document.getElementById('issue-photo-btn');
-  btn.textContent = '📷 Add a required photo';
-  btn.classList.remove('has-photo');
-  document.getElementById('issue-photo-preview').style.display='none';
-  document.getElementById('issue-photo-preview').innerHTML = '';
+  document.getElementById('issue-photo-btn').disabled = false;
+  renderPendingPhotos();
   document.getElementById('issue-form-error').textContent = '';
 }
 function addIssueToList(){
@@ -607,14 +625,14 @@ function addIssueToList(){
   const description = document.getElementById('issue-desc').value.trim();
   if(!selectedCategory){ err.textContent = 'Pick an issue category.'; return; }
   if(!description){ err.textContent = 'Describe the issue.'; return; }
-  if(!pendingPhotoFile){ err.textContent = 'A photo is required.'; return; }
+  if(pendingPhotos.length === 0){ err.textContent = 'At least one photo is required.'; return; }
   err.textContent = '';
   issues.push({
     localId: issueLocalIdSeq++,
     category: selectedCategory,
     description,
-    photoFile: pendingPhotoFile,
-    photoPreviewUrl: pendingPhotoPreviewUrl,
+    photoFiles: pendingPhotos.map(p => p.file),
+    photoPreviewUrl: pendingPhotos[0].previewUrl,
     status: 'draft', // draft | sending | sent | failed
     error: null
   });
@@ -748,7 +766,10 @@ async function submitOneIssue(issue, info, reporterName){
   const uploadQuery = `mutation ($file: File!, $item_id: ID!, $column_id: String!) {
     add_file_to_column (item_id: $item_id, column_id: $column_id, file: $file) { id }
   }`;
-  await mondayFileUpload(uploadQuery, itemId, REPAIR_COL.photo, issue.photoFile);
+  const photoFiles = issue.photoFiles || (issue.photoFile ? [issue.photoFile] : []);
+  for(const photoFile of photoFiles){
+    await mondayFileUpload(uploadQuery, itemId, REPAIR_COL.photo, photoFile);
+  }
 
   if(info.managerId){
     try{
@@ -804,7 +825,7 @@ async function fetchRepairsForBuilding(buildingId){
       const statusLabel = (cv[REPAIR_COL.status] && cv[REPAIR_COL.status].label) || '';
       if(statusLabel === 'Done') continue;
       const fileCol = cv[REPAIR_COL.photo];
-      const photoUrl = (fileCol && fileCol.files && fileCol.files[0] && fileCol.files[0].asset) ? fileCol.files[0].asset.public_url : null;
+      const photoUrls = (fileCol && fileCol.files || []).filter(f => f.asset).map(f => f.asset.public_url);
       results.push({
         id: it.id,
         createdAt: it.created_at,
@@ -812,7 +833,8 @@ async function fetchRepairsForBuilding(buildingId){
         category: (cv[REPAIR_COL.category] && cv[REPAIR_COL.category].label) || '',
         description: (cv[REPAIR_COL.description] && cv[REPAIR_COL.description].text) || '',
         reportedBy: (cv[REPAIR_COL.reportedBy] && cv[REPAIR_COL.reportedBy].text) || '',
-        photoUrl,
+        photoUrl: photoUrls[0] || null,
+        photoUrls,
         alreadySent: !!(cv[REPAIR_COL.sentToContractor] && cv[REPAIR_COL.sentToContractor].checked)
       });
     }
@@ -857,7 +879,7 @@ function openResolveForm(itemId){
   resolvePhotoPreviewUrl = null;
   document.getElementById('resolve-form-bld-name').textContent = currentBuilding.name;
   document.getElementById('resolve-form-summary').innerHTML = `
-    ${resolvingItem.photoUrl ? `<img src="${resolvingItem.photoUrl}">` : ''}
+    ${(resolvingItem.photoUrls||[]).map(u=>`<img src="${u}">`).join('')}
     <div class="body">
       <div class="cat">${escapeHtml(resolvingItem.location)} — ${escapeHtml(resolvingItem.category)}</div>
       <div class="meta">Reported by ${escapeHtml(resolvingItem.reportedBy)} · ${new Date(resolvingItem.createdAt).toLocaleDateString()}</div>
