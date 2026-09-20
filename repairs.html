@@ -254,9 +254,6 @@
     <div class="screen-pad">
       <input type="file" accept="image/*" capture="environment" id="insp-photo-input" style="display:none;" onchange="handleInspectionPhoto(this)">
       <div id="insp-sections"></div>
-      <div class="add-bedroom-card" id="insp-add-bedroom-card" style="display:none;">
-        <button type="button" id="insp-add-bedroom-btn" onclick="addInspectionBedroom()"></button>
-      </div>
       <label>Your name (inspector)</label>
       <input type="text" id="inspector-name" placeholder="Full name" oninput="saveInspectorName()">
       <div class="error-text" id="insp-form-error"></div>
@@ -345,7 +342,7 @@
 const MONDAY_TOKEN = "eyJhbGciOiJIUzI1NiJ9.eyJ0aWQiOjYzODAzNTMwOSwiYWFpIjoxMSwidWlkIjo2OTQ3MzQxMCwiaWFkIjoiMjAyNi0wMy0yNlQwOTozMDoyNC4wMDBaIiwicGVyIjoibWU6d3JpdGUiLCJhY3RpZCI6MjQyNDkyOTMsInJnbiI6ImV1YzEifQ.lRfb3yhcBlKPl1sz71YP8M39uIwl_103FQwW5-fhE60";
 const MONDAY_FILE_RELAY = 'https://little-poetry-f71b.tomerg1992.workers.dev/';
 const WORKER_INSPECTION_SUBMIT_URL = 'https://little-poetry-f71b.tomerg1992.workers.dev/inspection-submit';
-const APP_VERSION = "2026-09-20.1";
+const APP_VERSION = "2026-09-20.2";
 
 const BOARD_REPAIRS = 5103597278;
 const BOARD_PROJECTS = 1667314838;
@@ -382,6 +379,7 @@ const REPAIR_COL = {
 const REPAIRS_NEW_ISSUE_GROUP = "topics"; // default group new repair items land in
 const REPAIRS_EXPORTS_GROUP = "group_mm6xm3ez"; // "Contractor Exports" group — history of generated PDFs
 const REPAIRS_COMPLETED_GROUP = "group_mm6x244j"; // "Completed" group — resolved issues land here
+const REPAIRS_CONTROLS_GROUP = "group_mm6yee8e"; // "Export Controls" group — one PDF-trigger checkbox item per building, not a real issue
 
 const CATEGORIES = ["Plumbing","Electrical","Paint","Flooring & Walls","Furniture","Appliances","Doors/Windows/Locks","HVAC/AC","Woodwork","Other"];
 const COMMON_AREAS = ["Roof","Basement","Entrance/Lobby","Corridor","Facade","Elevator","Parking/Garage","Stairwell","Other"];
@@ -922,7 +920,7 @@ async function fetchRepairsForBuilding(buildingId){
     const data = await mondayApi(q, {cursor});
     const page = data.boards[0].items_page;
     for(const it of page.items){
-      if(it.group && (it.group.id === REPAIRS_EXPORTS_GROUP || it.group.id === REPAIRS_COMPLETED_GROUP)) continue;
+      if(it.group && (it.group.id === REPAIRS_EXPORTS_GROUP || it.group.id === REPAIRS_COMPLETED_GROUP || it.group.id === REPAIRS_CONTROLS_GROUP)) continue;
       const cv = {};
       for(const c of it.column_values){ cv[c.id] = c; }
       const buildingRel = cv[REPAIR_COL.building];
@@ -1082,7 +1080,6 @@ function startInspectionForApartment(aptId, aptName){
     const savedName = localStorage.getItem('repairs_inspector_name');
     if(savedName) document.getElementById('inspector-name').value = savedName;
   }catch(e){ /* localStorage can be unavailable — not fatal */ }
-  updateAddBedroomButton();
   renderInspectionChecklist();
   showScreen('screen-inspection');
 }
@@ -1118,19 +1115,7 @@ function addInspectionBedroom(){
     }
   }
   inspectionItems.splice(insertAt, 0, ...newItems);
-  updateAddBedroomButton();
   renderInspectionChecklist();
-}
-function updateAddBedroomButton(){
-  const nextLabel = EXTRA_BEDROOM_LABELS.find(label => !inspectionItems.some(i => i.section === label));
-  const card = document.getElementById('insp-add-bedroom-card');
-  const btn = document.getElementById('insp-add-bedroom-btn');
-  if(nextLabel){
-    card.style.display = 'block';
-    btn.textContent = '+ Add ' + nextLabel;
-  } else {
-    card.style.display = 'none';
-  }
 }
 function setInspectionStatus(key, status){
   const item = inspectionItems.find(i => i.key === key);
@@ -1185,10 +1170,19 @@ function renderInspectionChecklist(){
     bySection[item.section].push(item);
   }
   const container = document.getElementById('insp-sections');
+  const bedroomSections = ["11. Bedroom 1", ...EXTRA_BEDROOM_LABELS];
+  let lastBedroomSection = null;
+  for(const s of order){ if(bedroomSections.includes(s)) lastBedroomSection = s; }
+  const nextBedroomLabel = EXTRA_BEDROOM_LABELS.find(label => !inspectionItems.some(i => i.section === label));
+
   container.innerHTML = order.map(section => {
     const items = bySection[section];
     const done = items.filter(i => i.status).length;
     const rows = items.map(item => renderInspectionItemRow(item)).join('');
+    const addBedroomHtml = (section === lastBedroomSection && nextBedroomLabel) ? `
+    <div class="add-bedroom-card" id="insp-add-bedroom-card">
+      <button type="button" id="insp-add-bedroom-btn" onclick="addInspectionBedroom()">+ Add ${escapeHtml(nextBedroomLabel)}</button>
+    </div>` : '';
     return `
     <div class="insp-section">
       <div class="insp-section-head">
@@ -1196,14 +1190,19 @@ function renderInspectionChecklist(){
         <span class="insp-section-count">${done}/${items.length}</span>
       </div>
       ${rows}
-    </div>`;
+    </div>
+    ${addBedroomHtml}`;
   }).join('');
 
   const total = inspectionItems.length;
   const doneTotal = inspectionItems.filter(i => i.status).length;
   document.getElementById('insp-stats').innerHTML = `<b>${doneTotal}/${total}</b> items checked`;
-  const allDone = doneTotal === total && inspectionItems.every(i => i.status !== 'repair' || (i.category && i.description.trim() && i.photoFiles.length > 0));
+  const incompleteRepair = inspectionItems.find(i => i.status==='repair' && (!i.category || !i.description.trim() || i.photoFiles.length===0));
+  const allDone = doneTotal === total && !incompleteRepair;
   document.getElementById('insp-submit-btn').disabled = !allDone;
+  document.getElementById('insp-form-error').textContent = incompleteRepair
+    ? 'Every "Need Repair" item needs a category, description, and at least one photo — you cannot submit until all photos are added.'
+    : '';
 }
 function renderInspectionItemRow(item){
   const k = item.key.replace(/'/g, "\\'");
