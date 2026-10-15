@@ -120,6 +120,16 @@
   .export-row .cat{font-weight:800;font-size:13px;color:var(--navy);}
   .export-row .meta{font-size:11.5px;color:var(--gray);margin-top:2px;}
   .export-row .desc{font-size:12.5px;color:var(--dark);margin-top:4px;}
+  .export-row img.zoomable{cursor:zoom-in;}
+  .photo-preview img.zoomable{cursor:zoom-in;}
+  .photo-viewer{position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,0.92);display:none;flex-direction:column;align-items:center;justify-content:center;}
+  .photo-viewer.open{display:flex;}
+  .photo-viewer img{max-width:100%;max-height:calc(100% - 90px);object-fit:contain;touch-action:pinch-zoom;}
+  .photo-viewer .pv-close{position:absolute;top:14px;right:14px;width:44px;height:44px;border-radius:50%;border:none;background:rgba(255,255,255,0.18);color:#fff;font-size:26px;line-height:1;}
+  .photo-viewer .pv-nav{position:absolute;top:50%;transform:translateY(-50%);width:44px;height:56px;border:none;background:rgba(255,255,255,0.18);color:#fff;font-size:28px;border-radius:10px;}
+  .photo-viewer .pv-prev{left:10px;}
+  .photo-viewer .pv-next{right:10px;}
+  .photo-viewer .pv-count{position:absolute;bottom:22px;color:#fff;font-size:13px;font-weight:700;}
 
   .insp-section{border:1.5px solid var(--border);border-radius:12px;margin-bottom:14px;overflow:hidden;}
   .insp-section-head{background:#f2ede0;padding:11px 14px;font-weight:800;font-size:13.5px;display:flex;justify-content:space-between;align-items:center;color:var(--navy);}
@@ -209,8 +219,8 @@
       <button type="button" class="photo-btn" id="resolve-photo-btn" onclick="document.getElementById('resolve-photo-input').click()">📷 Add proof-of-fix photo</button>
       <div class="photo-preview" id="resolve-photo-preview" style="display:none;"></div>
 
-      <label>What was done</label>
-      <textarea id="resolve-notes" placeholder="Describe how the issue was fixed"></textarea>
+      <label>What was done (optional)</label>
+      <textarea id="resolve-notes" placeholder="Add a note if you like — a photo alone is enough"></textarea>
 
       <label>Your name</label>
       <input type="text" id="resolver-name" placeholder="Full name" oninput="saveResolverName()">
@@ -337,12 +347,20 @@
 
 
 </div>
+
+<div class="photo-viewer" id="photo-viewer" onclick="closePhotoViewer()">
+  <button type="button" class="pv-close" onclick="closePhotoViewer()" aria-label="Close photo">×</button>
+  <button type="button" class="pv-nav pv-prev" id="pv-prev" onclick="event.stopPropagation();stepPhotoViewer(-1)" aria-label="Previous photo">‹</button>
+  <img id="pv-img" alt="Photo" onclick="event.stopPropagation()">
+  <button type="button" class="pv-nav pv-next" id="pv-next" onclick="event.stopPropagation();stepPhotoViewer(1)" aria-label="Next photo">›</button>
+  <div class="pv-count" id="pv-count"></div>
+</div>
 <script>
 /* ============ CONFIG / CONSTANTS ============ */
 const MONDAY_TOKEN = "eyJhbGciOiJIUzI1NiJ9.eyJ0aWQiOjYzODAzNTMwOSwiYWFpIjoxMSwidWlkIjo2OTQ3MzQxMCwiaWFkIjoiMjAyNi0wMy0yNlQwOTozMDoyNC4wMDBaIiwicGVyIjoibWU6d3JpdGUiLCJhY3RpZCI6MjQyNDkyOTMsInJnbiI6ImV1YzEifQ.lRfb3yhcBlKPl1sz71YP8M39uIwl_103FQwW5-fhE60";
 const MONDAY_FILE_RELAY = 'https://little-poetry-f71b.tomerg1992.workers.dev/';
 const WORKER_INSPECTION_SUBMIT_URL = 'https://little-poetry-f71b.tomerg1992.workers.dev/inspection-submit';
-const APP_VERSION = "2026-09-20.2";
+const APP_VERSION = "2026-10-15.1";
 
 const BOARD_REPAIRS = 5103597278;
 const BOARD_PROJECTS = 1667314838;
@@ -381,9 +399,9 @@ const REPAIRS_EXPORTS_GROUP = "group_mm6xm3ez"; // "Contractor Exports" group �
 const REPAIRS_COMPLETED_GROUP = "group_mm6x244j"; // "Completed" group — resolved issues land here
 const REPAIRS_CONTROLS_GROUP = "group_mm6yee8e"; // "Export Controls" group — one PDF-trigger checkbox item per building, not a real issue
 
-const CATEGORIES = ["Plumbing","Electrical","Paint","Flooring & Walls","Furniture","Appliances","Doors/Windows/Locks","HVAC/AC","Woodwork","Other"];
+const CATEGORIES = ["Plumbing","Electrical","Paint","Flooring & Walls","Furniture","Appliances","Doors/Windows/Locks","HVAC/AC","Woodwork","Handyman","Other"];
 const COMMON_AREAS = ["Roof","Basement","Entrance/Lobby","Corridor","Facade","Elevator","Parking/Garage","Stairwell","Other"];
-const CATEGORY_ICONS = {"Plumbing":"\u{1F6B0}","Electrical":"⚡","Paint":"\u{1F3A8}","Flooring & Walls":"\u{1F9F1}","Furniture":"\u{1FA91}","Appliances":"\u{1F50C}","Doors/Windows/Locks":"\u{1F6AA}","HVAC/AC":"❄️","Woodwork":"\u{1FAB5}","Other":"\u{1F527}"};
+const CATEGORY_ICONS = {"Plumbing":"\u{1F6B0}","Electrical":"⚡","Paint":"\u{1F3A8}","Flooring & Walls":"\u{1F9F1}","Furniture":"\u{1FA91}","Appliances":"\u{1F50C}","Doors/Windows/Locks":"\u{1F6AA}","HVAC/AC":"❄️","Woodwork":"\u{1FAB5}","Handyman":"\u{1F6E0}️","Other":"\u{1F527}"};
 const AREA_ICONS = {"Roof":"\u{1F3E0}","Basement":"\u{1F573}️","Entrance/Lobby":"\u{1F6AA}","Corridor":"\u{1F6B6}","Facade":"\u{1F3E2}","Elevator":"\u{1F6D7}️","Parking/Garage":"\u{1F697}","Stairwell":"\u{1FA9C}","Other":"\u{1F527}"};
 
 /* ============ APARTMENT INSPECTION CHECKLIST (ported from VESTA Deliveries) ============ */
@@ -983,10 +1001,10 @@ function openResolveForm(itemId){
   resolvePhotoPreviewUrl = null;
   document.getElementById('resolve-form-bld-name').textContent = currentBuilding.name;
   document.getElementById('resolve-form-summary').innerHTML = `
-    ${(resolvingItem.photoUrls||[]).map(u=>`<img src="${u}">`).join('')}
+    ${(resolvingItem.photoUrls||[]).map((u,i)=>`<img class="zoomable" src="${u}" alt="Reported issue photo ${i+1}" onclick="openPhotoViewer(resolvingItem.photoUrls, ${i})">`).join('')}
     <div class="body">
       <div class="cat">${escapeHtml(resolvingItem.location)} — ${escapeHtml(resolvingItem.category)}</div>
-      <div class="meta">Reported by ${escapeHtml(resolvingItem.reportedBy)} · ${new Date(resolvingItem.createdAt).toLocaleDateString()}</div>
+      <div class="meta">Reported by ${escapeHtml(resolvingItem.reportedBy)} · ${new Date(resolvingItem.createdAt).toLocaleDateString()}${(resolvingItem.photoUrls||[]).length ? ' · tap photo to enlarge' : ''}</div>
       <div class="desc">${escapeHtml(resolvingItem.description)}</div>
     </div>
   `;
@@ -1014,8 +1032,38 @@ function handleResolvePhoto(input){
   btn.classList.add('has-photo');
   const prev = document.getElementById('resolve-photo-preview');
   prev.style.display = 'block';
-  prev.innerHTML = `<img src="${resolvePhotoPreviewUrl}">`;
+  prev.innerHTML = `<img class="zoomable" src="${resolvePhotoPreviewUrl}" onclick="openPhotoViewer([resolvePhotoPreviewUrl], 0)">`;
 }
+let photoViewerUrls = [];
+let photoViewerIdx = 0;
+function openPhotoViewer(urls, idx){
+  if(!urls || !urls.length) return;
+  photoViewerUrls = urls.slice();
+  photoViewerIdx = idx || 0;
+  renderPhotoViewer();
+  document.getElementById('photo-viewer').classList.add('open');
+}
+function closePhotoViewer(){
+  document.getElementById('photo-viewer').classList.remove('open');
+}
+function stepPhotoViewer(delta){
+  const n = photoViewerUrls.length;
+  photoViewerIdx = (photoViewerIdx + delta + n) % n;
+  renderPhotoViewer();
+}
+function renderPhotoViewer(){
+  const n = photoViewerUrls.length;
+  document.getElementById('pv-img').src = photoViewerUrls[photoViewerIdx];
+  document.getElementById('pv-prev').style.display = n > 1 ? 'block' : 'none';
+  document.getElementById('pv-next').style.display = n > 1 ? 'block' : 'none';
+  document.getElementById('pv-count').textContent = n > 1 ? `${photoViewerIdx + 1} / ${n}` : '';
+}
+document.addEventListener('keydown', e => {
+  if(!document.getElementById('photo-viewer').classList.contains('open')) return;
+  if(e.key === 'Escape') closePhotoViewer();
+  else if(e.key === 'ArrowLeft' && photoViewerUrls.length > 1) stepPhotoViewer(-1);
+  else if(e.key === 'ArrowRight' && photoViewerUrls.length > 1) stepPhotoViewer(1);
+});
 function saveResolverName(){
   try{ localStorage.setItem('repairs_resolver_name', document.getElementById('resolver-name').value.trim()); }
   catch(e){ /* localStorage can be unavailable — not fatal */ }
@@ -1025,7 +1073,6 @@ async function submitResolution(){
   const notes = document.getElementById('resolve-notes').value.trim();
   const resolverName = document.getElementById('resolver-name').value.trim();
   if(!resolverName){ err.textContent = 'Enter your name.'; return; }
-  if(!notes){ err.textContent = 'Describe what was done.'; return; }
   if(!resolvePhotoFile){ err.textContent = 'A proof-of-fix photo is required.'; return; }
   err.textContent = '';
   saveResolverName();
@@ -1035,11 +1082,11 @@ async function submitResolution(){
   btn.textContent = 'Submitting…';
   try{
     const columnValues = {
-      [REPAIR_COL.resolutionNotes]: {text: notes},
       [REPAIR_COL.resolvedBy]: resolverName,
       [REPAIR_COL.resolvedDate]: {date: new Date().toISOString().slice(0,10)},
       [REPAIR_COL.status]: {label: 'Done'}
     };
+    if(notes) columnValues[REPAIR_COL.resolutionNotes] = {text: notes};
     const mutation = `mutation($boardId:ID!, $itemId:ID!, $columnValues:JSON!){
       change_multiple_column_values(board_id:$boardId, item_id:$itemId, column_values:$columnValues){ id }
     }`;
