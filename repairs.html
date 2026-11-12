@@ -120,6 +120,25 @@
   .export-row .cat{font-weight:800;font-size:13px;color:var(--navy);}
   .export-row .meta{font-size:11.5px;color:var(--gray);margin-top:2px;}
   .export-row .desc{font-size:12.5px;color:var(--dark);margin-top:4px;}
+  html,body{overscroll-behavior-y:contain;} /* stops pull-down-to-refresh from wiping a form in progress */
+  .insp-toggle button{min-height:46px;line-height:1.15;white-space:normal;padding:8px 3px;font-size:11.5px;}
+  .insp-toggle button.sel-unchecked{background:var(--orange);border-color:var(--orange);color:#fff;}
+  .insp-item.missing{border-left:5px solid var(--red);background:#fff6f7;}
+  .insp-item .why{color:var(--red);font-size:12.5px;font-weight:800;margin-top:8px;}
+  .insp-item .prev{font-size:12px;color:var(--gray);margin:-2px 0 9px;font-weight:700;line-height:1.35;}
+  .insp-section-count.bad{color:var(--red);font-weight:800;}
+  .insp-banner{background:#fff7e0;border:1.5px solid #f0d98a;border-radius:12px;padding:12px 14px;font-size:13.5px;margin-bottom:14px;line-height:1.45;}
+  .name-missing{border-color:var(--red)!important;background:#fff6f7;}
+  #insp-stats u{color:var(--blue);cursor:pointer;font-weight:800;}
+  #upload-bar{position:fixed;top:0;left:0;right:0;z-index:98;background:#24220f;color:#fff;padding:6px 14px 8px;box-shadow:0 2px 10px rgba(0,0,0,0.25);}
+  #upload-bar .ub-row{padding:5px 0;}
+  #upload-bar .ub-row + .ub-row{border-top:1px solid rgba(255,255,255,0.15);}
+  #upload-bar .ub-top{display:flex;justify-content:space-between;font-size:13px;}
+  #upload-bar .ub-track{height:6px;background:rgba(255,255,255,0.2);border-radius:3px;margin:5px 0 3px;overflow:hidden;}
+  #upload-bar .ub-fill{height:100%;background:var(--green);transition:width .25s;}
+  #upload-bar .ub-row.failed .ub-fill{background:var(--red);}
+  #upload-bar .ub-msg{font-size:11.5px;opacity:.85;}
+  #upload-bar .ub-msg button{margin-left:8px;background:#fff;color:#24220f;border:none;border-radius:6px;padding:3px 10px;font-weight:800;font-size:11.5px;}
   .export-row img.zoomable{cursor:zoom-in;}
   .photo-preview img.zoomable{cursor:zoom-in;}
   .photo-viewer{position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,0.92);display:none;flex-direction:column;align-items:center;justify-content:center;}
@@ -253,24 +272,36 @@
   </div>
 
   <!-- ============ APARTMENT INSPECTION: checklist ============ -->
-  <div class="screen" id="screen-inspection">
+  <div class="screen" id="screen-insp-choice">
     <div class="brand-header">
       <div class="brand-row">
         <button type="button" class="back-icon" onclick="showScreen('screen-units')">←</button>
+        <div class="brand-text"><div class="app-name" id="insp-choice-title"></div></div>
+      </div>
+      <div class="app-sub" id="insp-choice-bld"></div>
+    </div>
+    <div class="screen-pad" id="insp-choice-body"></div>
+  </div>
+
+  <div class="screen" id="screen-inspection">
+    <div class="brand-header">
+      <div class="brand-row">
+        <button type="button" class="back-icon" onclick="leaveInspection()">←</button>
         <div class="brand-text"><div class="app-name" id="insp-apt-name"></div></div>
       </div>
       <div class="app-sub" id="insp-bld-name"></div>
     </div>
     <div class="screen-pad">
       <input type="file" accept="image/*" capture="environment" id="insp-photo-input" style="display:none;" onchange="handleInspectionPhoto(this)">
+      <div class="insp-banner" id="insp-banner" style="display:none;"></div>
       <div id="insp-sections"></div>
       <label>Your name (inspector)</label>
-      <input type="text" id="inspector-name" placeholder="Full name" oninput="saveInspectorName()">
+      <input type="text" id="inspector-name" placeholder="Full name" oninput="onInspectorNameInput()">
       <div class="error-text" id="insp-form-error"></div>
     </div>
     <div class="progress-bar">
-      <div class="stats" id="insp-stats"><b>0/0</b> items checked</div>
-      <button type="button" class="go" id="insp-submit-btn" onclick="submitInspection()" disabled>Submit</button>
+      <div class="stats" id="insp-stats"><b>0/0</b> answered</div>
+      <button type="button" class="go" id="insp-submit-btn" onclick="submitInspection()">Submit</button>
     </div>
   </div>
 
@@ -348,6 +379,8 @@
 
 </div>
 
+<div id="upload-bar" style="display:none;"></div>
+
 <div class="photo-viewer" id="photo-viewer" onclick="closePhotoViewer()">
   <button type="button" class="pv-close" onclick="closePhotoViewer()" aria-label="Close photo">×</button>
   <button type="button" class="pv-nav pv-prev" id="pv-prev" onclick="event.stopPropagation();stepPhotoViewer(-1)" aria-label="Previous photo">‹</button>
@@ -360,7 +393,7 @@
 const MONDAY_TOKEN = "eyJhbGciOiJIUzI1NiJ9.eyJ0aWQiOjYzODAzNTMwOSwiYWFpIjoxMSwidWlkIjo2OTQ3MzQxMCwiaWFkIjoiMjAyNi0wMy0yNlQwOTozMDoyNC4wMDBaIiwicGVyIjoibWU6d3JpdGUiLCJhY3RpZCI6MjQyNDkyOTMsInJnbiI6ImV1YzEifQ.lRfb3yhcBlKPl1sz71YP8M39uIwl_103FQwW5-fhE60";
 const MONDAY_FILE_RELAY = 'https://little-poetry-f71b.tomerg1992.workers.dev/';
 const WORKER_INSPECTION_SUBMIT_URL = 'https://little-poetry-f71b.tomerg1992.workers.dev/inspection-submit';
-const APP_VERSION = "2026-10-15.1";
+const APP_VERSION = "2026-11-12.1";
 
 const BOARD_REPAIRS = 5103597278;
 const BOARD_PROJECTS = 1667314838;
@@ -521,6 +554,7 @@ function loadConfig(){
   renderCommonAreaChips();
   renderCategoryButtons();
   loadBuildings();
+  resumePendingJobs();
 }
 function saveReporterName(){
   try{ localStorage.setItem('repairs_reporter_name', document.getElementById('reporter-name').value.trim()); }
@@ -1117,18 +1151,86 @@ async function submitResolution(){
 }
 
 /* ============ APARTMENT INSPECTION ============ */
-function startInspectionForApartment(aptId, aptName){
-  inspectionApartment = { id: aptId, name: aptName };
-  inspectionItems = buildInspectionItemsFromChecklist();
-  document.getElementById('insp-apt-name').textContent = aptName;
-  document.getElementById('insp-bld-name').textContent = currentBuilding.name;
-  document.getElementById('insp-form-error').textContent = '';
+// Order MUST mirror the worker's CATEGORIES array: the compact checklist
+// snapshot stores a category as its index in that list (Handyman last).
+const WORKER_CATEGORY_ORDER = ["Plumbing","Electrical","Paint","Flooring & Walls","Furniture","Appliances","Doors/Windows/Locks","HVAC/AC","Woodwork","Other","Handyman"];
+const MAX_PHOTOS_PER_ISSUE_INSPECT = MAX_PHOTOS_PER_ISSUE; // alias for readability below
+
+let inspectionMode = 'full';          // 'full' | 'reinspect'
+let inspectionDraftActive = false;    // true while the checklist screen owns the in-memory items (enables autosave)
+let inspectionShowProblems = false;   // turned on by a failed Submit so missing items stay highlighted until fixed
+
+/* ---------- local storage of drafts, photos and upload jobs (IndexedDB) ---------- */
+// A refresh, an accidental pull-to-refresh, or leaving the screen must never
+// throw away an inspection in progress, so everything (including photos) is
+// persisted locally as you go. All of it is best-effort: if the browser
+// refuses IndexedDB (private mode), the app still works, it just can't resume.
+let _idbPromise = null;
+function idbOpen(){
+  if(_idbPromise) return _idbPromise;
+  _idbPromise = new Promise((resolve, reject)=>{
+    try{
+      const req = indexedDB.open('vesta-repairs', 1);
+      req.onupgradeneeded = () => {
+        const db = req.result;
+        if(!db.objectStoreNames.contains('drafts')) db.createObjectStore('drafts', {keyPath:'aptId'});
+        if(!db.objectStoreNames.contains('jobs')) db.createObjectStore('jobs', {keyPath:'id'});
+        if(!db.objectStoreNames.contains('blobs')) db.createObjectStore('blobs');
+      };
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    }catch(e){ reject(e); }
+  });
+  _idbPromise.catch(()=>{});
+  return _idbPromise;
+}
+async function idbTx(store, mode, fn){
+  const db = await idbOpen();
+  return new Promise((resolve, reject)=>{
+    const tx = db.transaction(store, mode);
+    let result;
+    const r = fn(tx.objectStore(store));
+    if(r) r.onsuccess = () => { result = r.result; };
+    tx.oncomplete = () => resolve(result);
+    tx.onerror = () => reject(tx.error);
+    tx.onabort = () => reject(tx.error);
+  });
+}
+const idbGet = (s,k) => idbTx(s,'readonly',st=>st.get(k)).catch(()=>undefined);
+const idbPut = (s,v,k) => idbTx(s,'readwrite',st=>k===undefined?st.put(v):st.put(v,k)).catch(()=>{});
+const idbDel = (s,k) => idbTx(s,'readwrite',st=>st.delete(k)).catch(()=>{});
+const idbAll = (s) => idbTx(s,'readonly',st=>st.getAll()).then(r=>r||[]).catch(()=>[]);
+
+// Phone photos are 3MB+. Shrinking in the browser first makes the upload (and
+// the progress bar) many times faster and keeps the exported PDFs small.
+async function shrinkImageFile(file, maxDim = 1600, quality = 0.8){
   try{
-    const savedName = localStorage.getItem('repairs_inspector_name');
-    if(savedName) document.getElementById('inspector-name').value = savedName;
-  }catch(e){ /* localStorage can be unavailable — not fatal */ }
-  renderInspectionChecklist();
-  showScreen('screen-inspection');
+    if(!file || !/^image\/(jpeg|png|webp)$/i.test(file.type||'')) return file;
+    const bmp = await createImageBitmap(file, {imageOrientation:'from-image'});
+    const scale = Math.min(1, maxDim / Math.max(bmp.width, bmp.height));
+    if(scale === 1 && file.size < 600*1024){ bmp.close && bmp.close(); return file; }
+    const w = Math.max(1, Math.round(bmp.width*scale)), h = Math.max(1, Math.round(bmp.height*scale));
+    const canvas = document.createElement('canvas');
+    canvas.width = w; canvas.height = h;
+    canvas.getContext('2d').drawImage(bmp, 0, 0, w, h);
+    bmp.close && bmp.close();
+    const blob = await new Promise(res => canvas.toBlob(res, 'image/jpeg', quality));
+    if(!blob || blob.size >= file.size) return file;
+    return new File([blob], (file.name||'photo').replace(/\.[^.]+$/,'') + '.jpg', {type:'image/jpeg'});
+  }catch(e){ return file; }
+}
+function newKey(prefix){ return prefix + '-' + Date.now() + '-' + Math.random().toString(36).slice(2,8); }
+
+/* ---------- item model ---------- */
+function freshInspectionItem(section, text){
+  return {
+    key: section + '|' + text, section, text,
+    status: null, // null | 'approved' | 'repair' | 'na' | 'unchecked'
+    category: null, description: '', photoFiles: [], photoPreviewUrls: [], photoKeys: [],
+    // re-inspection bookkeeping
+    prevStatus: null, prevTicketId: null, prevTicketOpen: false, ticketUnknown: false,
+    reinspect: false, resolvedIssue: false
+  };
 }
 function buildInspectionItemsFromChecklist(){
   const out = [];
@@ -1139,80 +1241,348 @@ function buildInspectionItemsFromChecklist(){
   }
   return out;
 }
-function freshInspectionItem(section, text){
-  return {
-    key: section + '|' + text, section, text,
-    status: null, // null | 'approved' | 'repair' | 'na'
-    category: null, description: '', photoFiles: [], photoPreviewUrls: [],
-    mondayItemId: null, uploadedPhotoCount: 0, notifiedManager: false,
-    submitState: 'pending', // 'pending' | 'sending' | 'sent' | 'failed'
-    submitError: null
-  };
+function insertBedroomItems(items, label){
+  const template = CHECKLIST.find(s => s.s === "11. Bedroom 1").items;
+  const newItems = template.map(text => freshInspectionItem(label, text));
+  let insertAt = items.length;
+  for(let i = items.length - 1; i >= 0; i--){
+    if(items[i].section === "11. Bedroom 1" || EXTRA_BEDROOM_LABELS.includes(items[i].section)){ insertAt = i + 1; break; }
+  }
+  items.splice(insertAt, 0, ...newItems);
 }
 function addInspectionBedroom(){
   const nextLabel = EXTRA_BEDROOM_LABELS.find(label => !inspectionItems.some(i => i.section === label));
   if(!nextLabel) return;
-  const template = CHECKLIST.find(s => s.s === "11. Bedroom 1").items;
-  const newItems = template.map(text => freshInspectionItem(nextLabel, text));
-  let insertAt = inspectionItems.length;
-  for(let i = inspectionItems.length - 1; i >= 0; i--){
-    if(inspectionItems[i].section === "11. Bedroom 1" || EXTRA_BEDROOM_LABELS.includes(inspectionItems[i].section)){
-      insertAt = i + 1;
-      break;
-    }
-  }
-  inspectionItems.splice(insertAt, 0, ...newItems);
+  insertBedroomItems(inspectionItems, nextLabel);
   renderInspectionChecklist();
+  saveDraftSoon();
+}
+// An item that was a repair last time and whose Monday ticket is still open.
+function hasExistingTicket(i){ return i.prevStatus === 'repair' && !!i.prevTicketId && i.prevTicketOpen; }
+function isVisibleItem(i){ return inspectionMode !== 'reinspect' || i.reinspect; }
+
+/* ---------- drafts (autosave) ---------- */
+function draftHasProgress(items){
+  return items.some(i => i.status || i.description || (i.photoKeys||[]).length);
+}
+function itemToRecord(i){
+  return {
+    key:i.key, section:i.section, text:i.text, status:i.status, category:i.category, description:i.description,
+    photoKeys:i.photoKeys.slice(), prevStatus:i.prevStatus, prevTicketId:i.prevTicketId, prevTicketOpen:i.prevTicketOpen,
+    ticketUnknown:i.ticketUnknown, reinspect:i.reinspect, resolvedIssue:i.resolvedIssue
+  };
+}
+let draftTimer = null;
+function saveDraftSoon(){
+  if(!inspectionDraftActive) return;
+  clearTimeout(draftTimer);
+  draftTimer = setTimeout(saveDraftNow, 350);
+}
+async function saveDraftNow(){
+  clearTimeout(draftTimer);
+  if(!inspectionDraftActive || !inspectionApartment) return;
+  const aptId = String(inspectionApartment.id);
+  if(!draftHasProgress(inspectionItems)){ await idbDel('drafts', aptId); return; }
+  const nameEl = document.getElementById('inspector-name');
+  await idbPut('drafts', {
+    aptId, aptName: inspectionApartment.name, buildingId: currentBuilding.id, buildingName: currentBuilding.name,
+    mode: inspectionMode, inspectorName: nameEl ? nameEl.value.trim() : '', updatedAt: Date.now(),
+    items: inspectionItems.map(itemToRecord)
+  });
+}
+async function deleteDraft(aptId, alsoBlobs){
+  const d = await idbGet('drafts', String(aptId));
+  if(d && alsoBlobs){ for(const it of d.items){ for(const k of (it.photoKeys||[])) await idbDel('blobs', k); } }
+  await idbDel('drafts', String(aptId));
+}
+async function itemFromRecord(r){
+  const it = freshInspectionItem(r.section, r.text);
+  Object.assign(it, {
+    status:r.status, category:r.category, description:r.description||'', prevStatus:r.prevStatus, prevTicketId:r.prevTicketId,
+    prevTicketOpen:!!r.prevTicketOpen, ticketUnknown:!!r.ticketUnknown, reinspect:!!r.reinspect, resolvedIssue:!!r.resolvedIssue
+  });
+  for(const k of (r.photoKeys||[])){
+    const blob = await idbGet('blobs', k);
+    if(blob){ it.photoKeys.push(k); it.photoFiles.push(blob); it.photoPreviewUrls.push(URL.createObjectURL(blob)); }
+  }
+  return it;
+}
+function releaseItemPhotos(item, deleteBlobs){
+  item.photoPreviewUrls.forEach(u => { try{ URL.revokeObjectURL(u); }catch(e){} });
+  if(deleteBlobs) item.photoKeys.forEach(k => idbDel('blobs', k));
+  item.photoFiles = []; item.photoPreviewUrls = []; item.photoKeys = [];
+}
+
+/* ---------- opening an apartment: resume / re-inspect / new ---------- */
+function setChoice(html){ document.getElementById('insp-choice-body').innerHTML = html; }
+function choiceSpinner(msg){
+  setChoice(`<div class="center-box" style="padding:40px 0;"><div class="spinner"></div><p class="sub" style="margin-top:14px;">${escapeHtml(msg)}</p></div>`);
+}
+async function startInspectionForApartment(aptId, aptName){
+  await saveDraftNow();             // keep whatever apartment was open before
+  inspectionDraftActive = false;
+  inspectionApartment = { id: String(aptId), name: aptName };
+  document.getElementById('insp-choice-title').textContent = aptName;
+  document.getElementById('insp-choice-bld').textContent = currentBuilding.name;
+  showScreen('screen-insp-choice');
+  choiceSpinner('Loading…');
+  const draft = await idbGet('drafts', String(aptId));
+  if(draft && draftHasProgress(draft.items)){
+    const answered = draft.items.filter(i => i.status && (draft.mode !== 'reinspect' || i.reinspect)).length;
+    const total = draft.items.filter(i => draft.mode !== 'reinspect' || i.reinspect).length;
+    setChoice(`
+      <div class="insp-banner">You have an <b>unfinished inspection</b> for this apartment (${answered} of ${total} items done${draft.mode==='reinspect'?', re-inspection':''}). Nothing was lost.</div>
+      <button type="button" class="btn btn-primary" onclick="resumeDraft()">Continue where I left off</button>
+      <button type="button" class="btn btn-danger" onclick="discardDraftAndContinue()">Throw it away and start over</button>`);
+    return;
+  }
+  await checkPreviousInspection();
+}
+async function discardDraftAndContinue(){
+  if(!confirm('Delete the unfinished inspection (including its photos) and start over?')) return;
+  await deleteDraft(inspectionApartment.id, true);
+  await checkPreviousInspection();
+}
+async function resumeDraft(){
+  const draft = await idbGet('drafts', String(inspectionApartment.id));
+  if(!draft){ await checkPreviousInspection(); return; }
+  choiceSpinner('Restoring your inspection…');
+  inspectionMode = draft.mode || 'full';
+  inspectionItems = [];
+  for(const r of draft.items) inspectionItems.push(await itemFromRecord(r));
+  openChecklistScreen(draft.inspectorName);
+}
+
+// Compact snapshot rows -> items. Mirrors the worker's encode/decode exactly.
+function catalogRowToKey(idx){
+  const flat = [];
+  for(const s of CHECKLIST) for(const t of s.items) flat.push({section:s.s, text:t});
+  const bed = CHECKLIST.find(s => s.s === "11. Bedroom 1").items;
+  if(idx >= 200) return bed[idx-200] ? {section:EXTRA_BEDROOM_LABELS[1], text:bed[idx-200]} : null;
+  if(idx >= 100) return bed[idx-100] ? {section:EXTRA_BEDROOM_LABELS[0], text:bed[idx-100]} : null;
+  return flat[idx] || null;
+}
+function decodeSnapshot(text){
+  let rows;
+  try{ rows = JSON.parse(text); }catch(e){ return null; }
+  if(!Array.isArray(rows) || !rows.length) return null;
+  const out = [];
+  for(const row of rows){
+    const k = catalogRowToKey(row[0]);
+    if(!k) continue;
+    const code = row[1];
+    const e = {section:k.section, text:k.text, status:'approved', category:null, ticketId:null, resolved:false};
+    if(code === 0) e.status = 'na';
+    else if(code === 1){ e.status = 'repair'; e.category = WORKER_CATEGORY_ORDER[row[2]] || null; e.ticketId = row[3] ? String(row[3]) : null; }
+    else if(code === 3) e.status = 'unchecked';
+    else if(code === 2) e.resolved = true;
+    out.push(e);
+  }
+  return out.length ? out : null;
+}
+async function fetchApartmentSnapshot(aptId){
+  const data = await mondayApi(`query($ids:[ID!]){ items(ids:$ids){ column_values(ids:["long_text_mm7cfjm","date_mm7cbjxx","text_mm7cc9ma"]){ id text } } }`, {ids:[String(aptId)]});
+  const cv = {};
+  for(const c of ((data.items[0]||{}).column_values||[])) cv[c.id] = c.text || '';
+  if(!cv['long_text_mm7cfjm']) return null;
+  const rows = decodeSnapshot(cv['long_text_mm7cfjm']);
+  if(!rows) return null;
+  return { rows, date: cv['date_mm7cbjxx'], by: cv['text_mm7cc9ma'] };
+}
+async function checkPreviousInspection(){
+  choiceSpinner('Checking the previous inspection…');
+  let snap = null;
+  try{ snap = await fetchApartmentSnapshot(inspectionApartment.id); }
+  catch(e){ toast('Could not read the previous inspection: ' + e.message, 6000); }
+  if(!snap){ beginFullInspection(); return; }
+  const repairs = snap.rows.filter(r => r.status === 'repair').length;
+  const unchecked = snap.rows.filter(r => r.status === 'unchecked').length;
+  window._pendingSnapshot = snap;
+  const parts = [];
+  if(repairs) parts.push(`<b>${repairs}</b> open repair${repairs===1?'':'s'}`);
+  if(unchecked) parts.push(`<b>${unchecked}</b> item${unchecked===1?'':'s'} not checked`);
+  const summary = parts.length ? parts.join(' · ') : 'everything was approved';
+  setChoice(`
+    <div class="insp-banner">Last inspected <b>${escapeHtml(snap.date || '—')}</b>${snap.by ? ' by ' + escapeHtml(snap.by) : ''}: ${summary}.</div>
+    ${(repairs+unchecked) ? `<button type="button" class="btn btn-primary" onclick="beginReinspection()">Re-inspect only those ${repairs+unchecked} item${repairs+unchecked===1?'':'s'}</button>` : ''}
+    <button type="button" class="btn ${(repairs+unchecked)?'btn-ghost':'btn-primary'}" onclick="beginFullInspection()">Start a new full inspection</button>
+    <p class="sub" style="margin-top:14px;font-size:12.5px;">A new full inspection starts the whole checklist again. Repair tickets from the previous inspection stay open on Monday — use re-inspection to update those instead.</p>`);
+}
+function beginFullInspection(){
+  inspectionMode = 'full';
+  inspectionItems = buildInspectionItemsFromChecklist();
+  openChecklistScreen('');
+}
+async function beginReinspection(){
+  const snap = window._pendingSnapshot;
+  if(!snap){ beginFullInspection(); return; }
+  choiceSpinner('Preparing the re-inspection…');
+  const items = buildInspectionItemsFromChecklist();
+  for(const label of EXTRA_BEDROOM_LABELS){
+    if(snap.rows.some(r => r.section === label)) insertBedroomItems(items, label);
+  }
+  const byKey = new Map(items.map(i => [i.key, i]));
+  for(const r of snap.rows){
+    const it = byKey.get(r.section + '|' + r.text);
+    if(!it) continue;
+    it.prevStatus = r.status;
+    it.resolvedIssue = r.resolved;
+    it.status = r.status;                     // untouched rows keep last time's result
+    if(r.status === 'repair'){ it.category = r.category; it.prevTicketId = r.ticketId; }
+    if(r.status === 'repair' || r.status === 'unchecked'){ it.reinspect = true; it.status = null; }
+  }
+  const repairRows = items.filter(i => i.prevStatus === 'repair');
+  try{
+    await linkLegacyTickets(inspectionApartment.id, repairRows);
+    const ids = repairRows.map(i => i.prevTicketId).filter(Boolean);
+    if(ids.length){
+      const data = await mondayApi(`query($ids:[ID!]){ items(ids:$ids){ id column_values(ids:["${REPAIR_COL.status}"]){ ... on StatusValue { label } } } }`, {ids});
+      const open = new Map();
+      for(const t of data.items) open.set(String(t.id), ((t.column_values[0]||{}).label || '') !== 'Done');
+      for(const i of repairRows) i.prevTicketOpen = !!(i.prevTicketId && open.get(String(i.prevTicketId)));
+    }
+  }catch(e){
+    toast('Could not check the repair tickets: ' + e.message + ' — continuing without linking them.', 7000);
+  }
+  for(const i of repairRows) if(!i.prevTicketId) i.ticketUnknown = true;
+  inspectionMode = 'reinspect';
+  inspectionItems = items;
+  openChecklistScreen('');
+}
+// Inspections done before tickets were remembered in the snapshot: match each
+// repair row to its Monday ticket by category, but only when that is
+// unambiguous (exactly one repair row AND one open ticket of that category).
+async function linkLegacyTickets(aptId, repairRows){
+  const missing = repairRows.filter(i => !i.prevTicketId);
+  if(!missing.length) return;
+  const cands = [];
+  let cursor = null;
+  do{
+    const data = await mondayApi(`query($cursor:String){ boards(ids:[${BOARD_REPAIRS}]){ items_page(limit:100, cursor:$cursor){ cursor items{ id column_values(ids:["${REPAIR_COL.apartmentRecord}","${REPAIR_COL.status}","${REPAIR_COL.category}"]){ id ... on BoardRelationValue{ linked_item_ids } ... on StatusValue{ label } } } } } }`, {cursor});
+    const page = data.boards[0].items_page;
+    for(const t of page.items){
+      const cv = {}; for(const c of t.column_values) cv[c.id] = c;
+      const linked = ((cv[REPAIR_COL.apartmentRecord]||{}).linked_item_ids || []).map(String);
+      if(!linked.includes(String(aptId))) continue;
+      if(((cv[REPAIR_COL.status]||{}).label || '') === 'Done') continue;
+      cands.push({id:t.id, category:(cv[REPAIR_COL.category]||{}).label || ''});
+    }
+    cursor = page.cursor;
+  }while(cursor);
+  for(const cat of new Set(missing.map(i => i.category))){
+    const rows = missing.filter(i => i.category === cat);
+    const open = cands.filter(c => c.category === cat);
+    const allRowsOfCat = repairRows.filter(i => i.category === cat);
+    if(rows.length === 1 && allRowsOfCat.length === 1 && open.length === 1) rows[0].prevTicketId = open[0].id;
+  }
+}
+
+/* ---------- the checklist screen ---------- */
+function openChecklistScreen(savedName){
+  document.getElementById('insp-apt-name').textContent = inspectionApartment.name;
+  document.getElementById('insp-bld-name').textContent = currentBuilding.name;
+  document.getElementById('insp-form-error').textContent = '';
+  const nameEl = document.getElementById('inspector-name');
+  nameEl.classList.remove('name-missing');
+  let name = savedName || '';
+  if(!name){ try{ name = localStorage.getItem('repairs_inspector_name') || ''; }catch(e){} }
+  nameEl.value = name;
+  inspectionShowProblems = false;
+  inspectionDraftActive = true;
+  renderInspectionChecklist();
+  showScreen('screen-inspection');
+  saveDraftSoon();
+}
+async function leaveInspection(){
+  await saveDraftNow();
+  const had = inspectionItems.some(i => i.status);
+  inspectionDraftActive = false;
+  if(had) toast('Progress saved — open this apartment again to continue.', 4000);
+  showScreen('screen-units');
 }
 function setInspectionStatus(key, status){
   const item = inspectionItems.find(i => i.key === key);
   if(!item) return;
   item.status = status;
-  if(status !== 'repair'){
-    item.category = null; item.description = ''; item.photoFiles = []; item.photoPreviewUrls = [];
+  if(status !== 'repair' || hasExistingTicket(item)){
+    item.category = hasExistingTicket(item) ? item.category : null;
+    item.description = '';
+    releaseItemPhotos(item, true);
   }
   renderInspectionChecklist();
+  saveDraftSoon();
 }
 function setInspectionCategory(key, cat){
   const item = inspectionItems.find(i => i.key === key);
   if(!item) return;
   item.category = cat;
   renderInspectionChecklist();
+  saveDraftSoon();
 }
 function setInspectionDescription(key, value){
   const item = inspectionItems.find(i => i.key === key);
-  if(item) item.description = value;
+  if(item){ item.description = value; saveDraftSoon(); }
 }
 function openInspectionPhotoPicker(key){
   inspectionPhotoTargetKey = key;
   document.getElementById('insp-photo-input').click();
 }
-function handleInspectionPhoto(input){
+async function handleInspectionPhoto(input){
   const file = input.files && input.files[0];
   input.value = '';
-  if(!file || !inspectionPhotoTargetKey) return;
-  const item = inspectionItems.find(i => i.key === inspectionPhotoTargetKey);
-  if(!item || item.photoFiles.length >= MAX_PHOTOS_PER_ISSUE) return;
-  item.photoFiles.push(file);
-  item.photoPreviewUrls.push(URL.createObjectURL(file));
+  const key = inspectionPhotoTargetKey;
+  if(!file || !key) return;
+  const item = inspectionItems.find(i => i.key === key);
+  if(!item || item.photoFiles.length >= MAX_PHOTOS_PER_ISSUE_INSPECT) return;
+  const small = await shrinkImageFile(file);
+  const blobKey = newKey('p-' + inspectionApartment.id);
+  await idbPut('blobs', small, blobKey);
+  item.photoFiles.push(small);
+  item.photoKeys.push(blobKey);
+  item.photoPreviewUrls.push(URL.createObjectURL(small));
   renderInspectionChecklist();
+  saveDraftSoon();
 }
 function removeInspectionPhoto(key, idx){
   const item = inspectionItems.find(i => i.key === key);
   if(!item) return;
+  try{ URL.revokeObjectURL(item.photoPreviewUrls[idx]); }catch(e){}
+  idbDel('blobs', item.photoKeys[idx]);
   item.photoFiles.splice(idx, 1);
+  item.photoKeys.splice(idx, 1);
   item.photoPreviewUrls.splice(idx, 1);
   renderInspectionChecklist();
+  saveDraftSoon();
+}
+function onInspectorNameInput(){
+  saveInspectorName();
+  if(document.getElementById('inspector-name').value.trim()) document.getElementById('inspector-name').classList.remove('name-missing');
+  saveDraftSoon();
 }
 function saveInspectorName(){
   try{ localStorage.setItem('repairs_inspector_name', document.getElementById('inspector-name').value.trim()); }
   catch(e){ /* localStorage can be unavailable — not fatal */ }
 }
-const MAX_PHOTOS_PER_ISSUE_INSPECT = MAX_PHOTOS_PER_ISSUE; // alias for readability below
+function inspectionProblems(){
+  const out = [];
+  for(const i of inspectionItems){
+    if(!isVisibleItem(i)) continue;
+    if(!i.status) out.push({key:i.key, why:'Choose a status'});
+    else if(i.status === 'repair' && !hasExistingTicket(i)){
+      if(!i.category) out.push({key:i.key, why:'Pick a category'});
+      else if(!i.description.trim()) out.push({key:i.key, why:'Describe the issue'});
+    }
+  }
+  return out;
+}
+const PREV_LABELS = {repair:'✗ needed repair', unchecked:'⏸ was not checked'};
 function renderInspectionChecklist(){
+  const visible = inspectionItems.filter(isVisibleItem);
+  const problemMap = new Map();
+  if(inspectionShowProblems) for(const p of inspectionProblems()) problemMap.set(p.key, p.why);
   const bySection = {};
   const order = [];
-  for(const item of inspectionItems){
+  for(const item of visible){
     if(!bySection[item.section]){ bySection[item.section] = []; order.push(item.section); }
     bySection[item.section].push(item);
   }
@@ -1221,12 +1591,14 @@ function renderInspectionChecklist(){
   let lastBedroomSection = null;
   for(const s of order){ if(bedroomSections.includes(s)) lastBedroomSection = s; }
   const nextBedroomLabel = EXTRA_BEDROOM_LABELS.find(label => !inspectionItems.some(i => i.section === label));
+  const allowBedrooms = inspectionMode === 'full';
 
   container.innerHTML = order.map(section => {
     const items = bySection[section];
     const done = items.filter(i => i.status).length;
-    const rows = items.map(item => renderInspectionItemRow(item)).join('');
-    const addBedroomHtml = (section === lastBedroomSection && nextBedroomLabel) ? `
+    const bad = items.some(i => problemMap.has(i.key));
+    const rows = items.map(item => renderInspectionItemRow(item, problemMap.get(item.key))).join('');
+    const addBedroomHtml = (allowBedrooms && section === lastBedroomSection && nextBedroomLabel) ? `
     <div class="add-bedroom-card" id="insp-add-bedroom-card">
       <button type="button" id="insp-add-bedroom-btn" onclick="addInspectionBedroom()">+ Add ${escapeHtml(nextBedroomLabel)}</button>
     </div>` : '';
@@ -1234,34 +1606,41 @@ function renderInspectionChecklist(){
     <div class="insp-section">
       <div class="insp-section-head">
         <span>${escapeHtml(section)}</span>
-        <span class="insp-section-count">${done}/${items.length}</span>
+        <span class="insp-section-count ${bad?'bad':''}">${done}/${items.length}</span>
       </div>
       ${rows}
     </div>
     ${addBedroomHtml}`;
   }).join('');
 
-  const total = inspectionItems.length;
-  const doneTotal = inspectionItems.filter(i => i.status).length;
-  document.getElementById('insp-stats').innerHTML = `<b>${doneTotal}/${total}</b> items checked`;
-  const incompleteRepair = inspectionItems.find(i => i.status==='repair' && (!i.category || !i.description.trim() || i.photoFiles.length===0));
-  const allDone = doneTotal === total && !incompleteRepair;
-  document.getElementById('insp-submit-btn').disabled = !allDone;
-  document.getElementById('insp-form-error').textContent = incompleteRepair
-    ? 'Every "Need Repair" item needs a category, description, and at least one photo — you cannot submit until all photos are added.'
-    : '';
+  const banner = document.getElementById('insp-banner');
+  if(inspectionMode === 'reinspect'){
+    banner.style.display = 'block';
+    banner.innerHTML = `<b>Re-inspection.</b> Only the ${visible.length} item${visible.length===1?'':'s'} that needed repair or were not checked are shown. Everything else stays as approved last time.`;
+  } else banner.style.display = 'none';
+
+  const total = visible.length;
+  const doneTotal = visible.filter(i => i.status).length;
+  const left = total - doneTotal;
+  const stats = document.getElementById('insp-stats');
+  stats.innerHTML = `<b>${doneTotal}/${total}</b> answered` + (left > 0 && inspectionShowProblems ? ` · <u onclick="jumpToNextMissing()">jump to next</u>` : '');
+  const err = document.getElementById('insp-form-error');
+  if(inspectionShowProblems){
+    err.textContent = problemMap.size ? `${problemMap.size} item${problemMap.size===1?'':'s'} still need${problemMap.size===1?'s':''} an answer — highlighted in red.` : '';
+  }
 }
-function renderInspectionItemRow(item){
+function renderInspectionItemRow(item, problemWhy){
   const k = item.key.replace(/'/g, "\\'");
+  const existing = hasExistingTicket(item);
   let repairForm = '';
-  if(item.status === 'repair'){
+  if(item.status === 'repair' && !existing){
     const catButtons = CATEGORIES.map(c => `
       <button type="button" class="cat-btn ${item.category===c?'sel':''}" onclick="setInspectionCategory('${k}','${c.replace(/'/g,"\\'")}')">${CATEGORY_ICONS[c]||''} ${escapeHtml(c)}</button>
     `).join('');
     const photos = item.photoPreviewUrls.map((url, idx) => `
       <div class="photo-thumb"><img src="${url}"><button type="button" class="rm" onclick="removeInspectionPhoto('${k}',${idx})">×</button></div>
     `).join('');
-    const photoBtnLabel = item.photoFiles.length === 0 ? '📷 Add a required photo (up to 2)'
+    const photoBtnLabel = item.photoFiles.length === 0 ? '📷 Add a photo (optional, up to 2)'
       : (item.photoFiles.length < MAX_PHOTOS_PER_ISSUE_INSPECT ? `📷 Add another photo (${item.photoFiles.length}/${MAX_PHOTOS_PER_ISSUE_INSPECT})` : `📷 ${item.photoFiles.length}/${MAX_PHOTOS_PER_ISSUE_INSPECT} photos added`);
     repairForm = `
       <div class="insp-repair-form">
@@ -1272,150 +1651,311 @@ function renderInspectionItemRow(item){
         <button type="button" class="photo-btn ${item.photoFiles.length?'has-photo':''}" ${item.photoFiles.length>=MAX_PHOTOS_PER_ISSUE_INSPECT?'disabled':''} onclick="openInspectionPhotoPicker('${k}')">${photoBtnLabel}</button>
         <div class="photo-preview" style="${photos?'display:flex;':'display:none;'}">${photos}</div>
       </div>`;
+  } else if(item.status === 'repair' && existing){
+    repairForm = `<div class="prev">The existing repair ticket${item.category ? ' (' + escapeHtml(item.category) + ')' : ''} stays open on Monday.</div>`;
   }
-  let statusNote = '';
-  if(item.submitState === 'sending') statusNote = '<div class="issue-status pending">Sending…</div>';
-  else if(item.submitState === 'sent') statusNote = '<div class="issue-status ok">✓ Sent</div>';
-  else if(item.submitState === 'failed') statusNote = `<div class="issue-status err">Failed: ${escapeHtml(item.submitError||'')}</div>`;
+  let prevLine = '';
+  if(item.reinspect){
+    prevLine = `<div class="prev">Last time: ${PREV_LABELS[item.prevStatus] || ''}`
+      + (item.prevStatus === 'repair' && item.category ? ' — ' + escapeHtml(item.category) : '')
+      + (item.prevStatus === 'repair' && !existing && item.prevTicketId ? '. Its ticket is already marked Done on Monday.' : '')
+      + (item.ticketUnknown ? '. Its Monday ticket could not be matched automatically — if you approve it, close that ticket on Monday yourself.' : '')
+      + '</div>';
+  }
+  const btn = (st, cls, label) => `<button type="button" class="${item.status===st?cls:''}" onclick="setInspectionStatus('${k}','${st}')">${label}</button>`;
+  const toggle = existing
+    ? btn('approved','sel-approved','✓ Fixed') + btn('repair','sel-repair','✗ Still needs repair') + btn('na','sel-na','N/A')
+    : btn('approved','sel-approved','✓ Approved') + btn('repair','sel-repair','✗ Need Repair') + btn('na','sel-na','N/A') + btn('unchecked','sel-unchecked','⏸ Not checked');
   return `
-    <div class="insp-item">
+    <div class="insp-item ${problemWhy?'missing':''}" data-key="${escapeHtml(item.key)}">
       <div class="txt">${escapeHtml(item.text)}</div>
-      <div class="insp-toggle">
-        <button type="button" class="${item.status==='approved'?'sel-approved':''}" onclick="setInspectionStatus('${k}','approved')">✓ Approved</button>
-        <button type="button" class="${item.status==='repair'?'sel-repair':''}" onclick="setInspectionStatus('${k}','repair')">✗ Need Repair</button>
-        <button type="button" class="${item.status==='na'?'sel-na':''}" onclick="setInspectionStatus('${k}','na')">N/A</button>
-      </div>
+      ${prevLine}
+      <div class="insp-toggle">${toggle}</div>
       ${repairForm}
-      ${statusNote}
+      ${problemWhy ? `<div class="why">⚠ ${escapeHtml(problemWhy)}</div>` : ''}
     </div>`;
 }
+function jumpToNextMissing(){
+  const el = document.querySelector('.insp-item.missing');
+  if(el) el.scrollIntoView({behavior:'smooth', block:'center'});
+}
+
+/* ---------- submit -> background upload ---------- */
 async function submitInspection(){
-  const err = document.getElementById('insp-form-error');
-  const inspectorName = document.getElementById('inspector-name').value.trim();
-  if(!inspectorName){ err.textContent = 'Enter your name.'; return; }
-  const total = inspectionItems.length;
-  const doneTotal = inspectionItems.filter(i => i.status).length;
-  if(doneTotal < total){ err.textContent = 'Every item needs a status before you can submit.'; return; }
-  const incompleteRepair = inspectionItems.find(i => i.status==='repair' && (!i.category || !i.description.trim() || i.photoFiles.length===0));
-  if(incompleteRepair){ err.textContent = 'Every "Need Repair" item needs a category, description, and at least one photo.'; return; }
-  err.textContent = '';
+  const nameEl = document.getElementById('inspector-name');
+  const inspectorName = nameEl.value.trim();
+  const problems = inspectionProblems();
+  inspectionShowProblems = true;
+  if(!inspectorName || problems.length){
+    nameEl.classList.toggle('name-missing', !inspectorName);
+    renderInspectionChecklist();
+    const err = document.getElementById('insp-form-error');
+    const bits = [];
+    if(problems.length) bits.push(`${problems.length} item${problems.length===1?'':'s'} still need${problems.length===1?'s':''} an answer (highlighted in red)`);
+    if(!inspectorName) bits.push('enter your name at the bottom');
+    err.textContent = bits.join(' and ') + '.';
+    toast('Almost there — ' + bits.join(' and ') + '.', 4500);
+    if(problems.length) jumpToNextMissing();
+    else { nameEl.scrollIntoView({behavior:'smooth', block:'center'}); nameEl.focus(); }
+    return;
+  }
   saveInspectorName();
+  await saveDraftNow();
 
-  const btn = document.getElementById('insp-submit-btn');
-  btn.disabled = true;
-  btn.textContent = 'Submitting…';
+  const items = inspectionItems.map(i => ({
+    key:i.key, section:i.section, text:i.text, status:i.status, category:i.category, description:i.description,
+    photoKeys:i.photoKeys.slice(), photoSizes:i.photoFiles.map(f => f.size), photoNames:i.photoFiles.map(f => f.name || 'photo.jpg'),
+    prevStatus:i.prevStatus, prevTicketId:i.prevTicketId, prevTicketOpen:i.prevTicketOpen, resolvedIssue:i.resolvedIssue,
+    mondayItemId:null, uploadedPhotoCount:0, notifiedManager:false, closed:false
+  }));
+  const job = {
+    id: newKey('job'), aptId: String(inspectionApartment.id), aptName: inspectionApartment.name,
+    buildingId: String(currentBuilding.id), buildingName: currentBuilding.name,
+    inspectorName, mode: inspectionMode, items, state:'queued', phase:'Waiting…', error:null,
+    reportSent:false, doneUnits:0, createdAt: Date.now()
+  };
+  job.totalUnits = computeJobUnits(job);
+  const repairCount = items.filter(i => i.status==='repair' && !jobHasExistingTicket(i)).length;
+  const closeCount = items.filter(i => jobHasExistingTicket(i) && (i.status==='approved' || i.status==='na')).length;
+  await idbPut('jobs', job);
+  // The draft is now owned by the job; clear it (but keep the photo blobs the job needs).
+  await deleteDraft(job.aptId, false);
+  inspectionDraftActive = false;
+  inspectionItems.forEach(i => releaseItemPhotos(i, false));
+  inspectionItems = [];
+  enqueueJob(job);
 
-  let info;
-  try{
-    info = await getBuildingInfo(currentBuilding.id);
-  }catch(e){
-    toast('Could not load the Project Manager for this building: ' + e.message, 8000);
-    btn.disabled = false; btn.textContent = 'Submit';
-    return;
-  }
-
-  const repairItems = inspectionItems.filter(i => i.status === 'repair');
-  let anyFailed = false;
-  for(const item of repairItems){
-    if(item.submitState === 'sent') continue;
-    item.submitState = 'sending'; item.submitError = null;
-    renderInspectionChecklist();
-    try{
-      await submitInspectionRepairItem(item, info, inspectorName);
-      item.submitState = 'sent';
-    }catch(e){
-      item.submitState = 'failed';
-      item.submitError = e.message;
-      anyFailed = true;
-    }
-    renderInspectionChecklist();
-  }
-
-  btn.textContent = 'Submit';
-  btn.disabled = false;
-
-  if(anyFailed){
-    toast('Some issues failed to send — check the list and tap Submit again to retry.', 8000);
-    return;
-  }
-
-  try{
-    await submitInspectionReport(inspectorName);
-  }catch(e){
-    toast('Repairs were logged, but the inspection report could not be saved: ' + e.message, 8000);
-  }
-
-  const repairCount = repairItems.length;
-  document.getElementById('insp-done-sub').textContent = repairCount === 0
-    ? `${inspectionApartment.name} inspected — everything approved, no issues logged.`
-    : `${inspectionApartment.name} inspected — ${repairCount} issue${repairCount===1?'':'s'} logged for repair.`;
+  let msg = `${job.aptName} — your answers are saved and uploading in the background (see the bar at the top).`;
+  if(repairCount) msg += ` ${repairCount} repair${repairCount===1?'':'s'} will be logged.`;
+  if(closeCount) msg += ` ${closeCount} fixed ticket${closeCount===1?'':'s'} will be closed.`;
+  document.getElementById('insp-done-sub').textContent = msg + ' You can start the next inspection right away.';
   showScreen('screen-inspection-done');
 }
-async function submitInspectionRepairItem(item, info, inspectorName){
+
+const UNIT_API = 25000; // an API call counts as ~25KB of "upload work" when computing the progress percentage
+function jobHasExistingTicket(i){ return i.prevStatus === 'repair' && !!i.prevTicketId && i.prevTicketOpen; }
+function computeJobUnits(job){
+  let total = 2*UNIT_API; // saving the report + PDF
+  for(const i of job.items){
+    if(i.status==='repair' && !jobHasExistingTicket(i)){
+      total += UNIT_API + i.photoSizes.reduce((a,b)=>a+b, 0) + UNIT_API/2;
+    } else if(jobHasExistingTicket(i) && (i.status==='approved' || i.status==='na')){
+      total += 2*UNIT_API;
+    }
+  }
+  return total;
+}
+
+/* ---------- upload queue ---------- */
+const uploadJobs = [];
+let uploadWorkerRunning = false;
+async function saveJob(job){ await idbPut('jobs', job); }
+function enqueueJob(job){
+  if(!uploadJobs.includes(job)) uploadJobs.push(job);
+  job.state = 'queued'; job.phase = 'Waiting…'; job.error = null;
+  renderUploadBar();
+  runUploadQueue();
+}
+async function runUploadQueue(){
+  if(uploadWorkerRunning) return;
+  uploadWorkerRunning = true;
+  try{
+    for(;;){
+      const next = uploadJobs.find(j => j.state === 'queued');
+      if(!next) break;
+      await runJob(next);
+    }
+  } finally { uploadWorkerRunning = false; }
+}
+function jobPercent(job){
+  if(job.state === 'done') return 100;
+  return Math.min(99, Math.floor(100 * ((job.doneUnits + (job.liveUnits||0)) / Math.max(1, job.totalUnits))));
+}
+async function jobAdvance(job, units){ job.doneUnits += units; job.liveUnits = 0; await saveJob(job); renderUploadBar(); }
+async function runJob(job){
+  job.state = 'running'; job.error = null; job.liveUnits = 0;
+  renderUploadBar();
+  try{
+    const info = await getBuildingInfo(job.buildingId);
+    for(const it of job.items){
+      if(it.status !== 'repair' || jobHasExistingTicket(it)) continue;
+      await jobSubmitRepairItem(job, it, info);
+    }
+    if(!job.reportSent){
+      job.phase = 'Saving the inspection report…'; renderUploadBar();
+      await jobSubmitReport(job);
+      job.reportSent = true;
+      await jobAdvance(job, 2*UNIT_API);
+    }
+    for(const it of job.items){
+      if(jobHasExistingTicket(it) && (it.status==='approved' || it.status==='na') && !it.closed){
+        job.phase = 'Closing fixed repair tickets…'; renderUploadBar();
+        await jobCloseTicket(job, it);
+      }
+    }
+    job.state = 'done'; job.phase = 'Done'; job.showUntil = Date.now() + 8000;
+    await idbDel('jobs', job.id);
+    for(const it of job.items) for(const k of it.photoKeys) await idbDel('blobs', k);
+    toast(`${job.aptName} uploaded ✓`, 4000);
+    setTimeout(renderUploadBar, 8200);
+  }catch(e){
+    job.state = 'failed'; job.error = e.message || String(e); job.phase = 'Upload failed';
+    await saveJob(job);
+  }
+  renderUploadBar();
+}
+async function jobSubmitRepairItem(job, item, info){
   if(!item.mondayItemId){
+    job.phase = 'Creating repair ticket…'; renderUploadBar();
     const columnValues = {
-      [REPAIR_COL.building]: {item_ids:[Number(currentBuilding.id)]},
-      [REPAIR_COL.location]: inspectionApartment.name,
-      [REPAIR_COL.apartmentRecord]: {item_ids:[Number(inspectionApartment.id)]},
+      [REPAIR_COL.building]: {item_ids:[Number(job.buildingId)]},
+      [REPAIR_COL.location]: job.aptName,
+      [REPAIR_COL.apartmentRecord]: {item_ids:[Number(job.aptId)]},
       [REPAIR_COL.category]: {label: item.category},
       [REPAIR_COL.description]: {text: item.description},
-      [REPAIR_COL.reportedBy]: inspectorName,
+      [REPAIR_COL.reportedBy]: job.inspectorName,
       [REPAIR_COL.status]: {label: 'New'}
     };
-    if(info.managerId){
-      columnValues[REPAIR_COL.manager] = {personsAndTeams:[{id:Number(info.managerId), kind:'person'}]};
-    }
-    const itemName = `${currentBuilding.name} — ${inspectionApartment.name} — ${item.category}`;
+    if(info.managerId) columnValues[REPAIR_COL.manager] = {personsAndTeams:[{id:Number(info.managerId), kind:'person'}]};
     const mutation = `mutation($boardId:ID!, $groupId:String!, $itemName:String!, $columnValues:JSON!){
       create_item(board_id:$boardId, group_id:$groupId, item_name:$itemName, column_values:$columnValues){ id }
     }`;
     const data = await mondayApi(mutation, {
-      boardId: BOARD_REPAIRS, groupId: REPAIRS_NEW_ISSUE_GROUP, itemName, columnValues: JSON.stringify(columnValues)
+      boardId: BOARD_REPAIRS, groupId: REPAIRS_NEW_ISSUE_GROUP,
+      itemName: `${job.buildingName} — ${job.aptName} — ${item.category}`, columnValues: JSON.stringify(columnValues)
     });
     item.mondayItemId = data.create_item.id;
+    await jobAdvance(job, UNIT_API);
   }
-  const itemId = item.mondayItemId;
-
   const uploadQuery = `mutation ($file: File!, $item_id: ID!, $column_id: String!) {
     add_file_to_column (item_id: $item_id, column_id: $column_id, file: $file) { id }
   }`;
-  for(let i = item.uploadedPhotoCount || 0; i < item.photoFiles.length; i++){
-    await mondayFileUpload(uploadQuery, itemId, REPAIR_COL.photo, item.photoFiles[i]);
+  for(let i = item.uploadedPhotoCount || 0; i < item.photoKeys.length; i++){
+    const blob = await idbGet('blobs', item.photoKeys[i]);
+    if(!blob) { item.uploadedPhotoCount = i + 1; continue; }   // photo no longer on this device — skip rather than block the whole upload
+    job.phase = `Uploading photo ${i+1} of ${item.photoKeys.length} (${item.category})…`; renderUploadBar();
+    const base = job.doneUnits;
+    await mondayFileUploadXhr(uploadQuery, item.mondayItemId, REPAIR_COL.photo, new File([blob], item.photoNames[i] || 'photo.jpg', {type: blob.type || 'image/jpeg'}),
+      loaded => { job.liveUnits = Math.min(loaded, item.photoSizes[i]); renderUploadBar(); });
     item.uploadedPhotoCount = i + 1;
+    await jobAdvance(job, item.photoSizes[i]);
+    job.doneUnits = base + item.photoSizes[i];
   }
-
   if(info.managerId && !item.notifiedManager){
     try{
-      const notifQuery = `mutation($userId:ID!, $targetId:ID!, $text:String!){
+      await mondayApi(`mutation($userId:ID!, $targetId:ID!, $text:String!){
         create_notification(user_id:$userId, target_id:$targetId, text:$text, target_type:Project){ id }
-      }`;
-      await mondayApi(notifQuery, {
-        userId: info.managerId, targetId: itemId,
-        text: `Apartment inspection found an issue at ${currentBuilding.name} — ${inspectionApartment.name} (${item.category}), reported by ${inspectorName}.`
+      }`, {
+        userId: info.managerId, targetId: item.mondayItemId,
+        text: `Apartment inspection found an issue at ${job.buildingName} — ${job.aptName} (${item.category}), reported by ${job.inspectorName}.`
       });
-      item.notifiedManager = true;
     }catch(e){ /* notification failure shouldn't block the report itself */ }
+    item.notifiedManager = true;
+    await jobAdvance(job, UNIT_API/2);
   }
 }
-async function submitInspectionReport(inspectorName){
-  const checklist = inspectionItems.map(i => ({
-    section: i.section, text: i.text, status: i.status, category: i.category || null, repairItemId: i.mondayItemId || null
-  }));
+function mondayFileUploadXhr(query, itemId, columnId, file, onProgress){
+  return new Promise((resolve, reject)=>{
+    const form = new FormData();
+    form.append('query', query);
+    form.append('variables[item_id]', itemId);
+    form.append('variables[column_id]', columnId);
+    form.append('variables[file]', file, file.name || 'photo.jpg');
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', MONDAY_FILE_RELAY);
+    xhr.setRequestHeader('Authorization', MONDAY_TOKEN);
+    xhr.timeout = 120000;
+    xhr.upload.onprogress = e => { if(e.lengthComputable) onProgress(e.loaded); };
+    xhr.onload = () => {
+      try{
+        const json = JSON.parse(xhr.responseText);
+        if(json.errors) reject(new Error(json.errors.map(e=>e.message).join('; ')));
+        else resolve(json.data);
+      }catch(e){ reject(new Error(`Unexpected response while uploading a photo (HTTP ${xhr.status})`)); }
+    };
+    xhr.onerror = () => reject(new Error('Network error while uploading a photo'));
+    xhr.ontimeout = () => reject(new Error('A photo upload timed out — check your connection'));
+    xhr.send(form);
+  });
+}
+async function jobSubmitReport(job){
+  const checklist = job.items.map(i => {
+    const existing = jobHasExistingTicket(i);
+    const keptRepair = i.status === 'repair';
+    return {
+      section:i.section, text:i.text, status:i.status, category:i.category || null,
+      repairItemId: keptRepair ? (existing ? i.prevTicketId : i.mondayItemId) : null,
+      resolvedIssue: i.status === 'approved' && (i.resolvedIssue || i.prevStatus === 'repair')
+    };
+  });
   const res = await fetchWithTimeout(WORKER_INSPECTION_SUBMIT_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': MONDAY_TOKEN },
-    body: JSON.stringify({
-      apartmentId: inspectionApartment.id,
-      buildingName: currentBuilding.name,
-      apartmentName: inspectionApartment.name,
-      inspectorName,
-      checklist
-    })
-  }, 30000);
+    body: JSON.stringify({ apartmentId: job.aptId, buildingName: job.buildingName, apartmentName: job.aptName, inspectorName: job.inspectorName, checklist })
+  }, 45000);
   const json = await parseJsonResponse(res);
   if(json.error) throw new Error(json.error);
   return json;
 }
+async function jobCloseTicket(job, item){
+  const note = item.status === 'na' ? 'Marked N/A during re-inspection.' : 'Verified fixed during re-inspection.';
+  await mondayApi(`mutation($boardId:ID!, $itemId:ID!, $columnValues:JSON!){
+    change_multiple_column_values(board_id:$boardId, item_id:$itemId, column_values:$columnValues){ id }
+  }`, {
+    boardId: BOARD_REPAIRS, itemId: item.prevTicketId,
+    columnValues: JSON.stringify({
+      [REPAIR_COL.resolutionNotes]: {text: note},
+      [REPAIR_COL.resolvedBy]: job.inspectorName,
+      [REPAIR_COL.resolvedDate]: {date: new Date().toISOString().slice(0,10)},
+      [REPAIR_COL.status]: {label: 'Done'}
+    })
+  });
+  await mondayApi(`mutation($itemId:ID!, $groupId:String!){ move_item_to_group(item_id:$itemId, group_id:$groupId){ id } }`,
+    {itemId: item.prevTicketId, groupId: REPAIRS_COMPLETED_GROUP});
+  item.closed = true;
+  await jobAdvance(job, 2*UNIT_API);
+}
+
+/* ---------- upload bar ---------- */
+let uploadBarRaf = null;
+function renderUploadBar(){
+  if(uploadBarRaf) return;
+  uploadBarRaf = requestAnimationFrame(()=>{
+    uploadBarRaf = null;
+    const bar = document.getElementById('upload-bar');
+    const shown = uploadJobs.filter(j => j.state !== 'done' || (j.showUntil && j.showUntil > Date.now()));
+    if(!shown.length){ bar.style.display = 'none'; document.body.style.paddingTop = '0'; return; }
+    bar.innerHTML = shown.map(j => {
+      const pct = jobPercent(j);
+      const failed = j.state === 'failed';
+      return `<div class="ub-row ${failed?'failed':''} ${j.state==='done'?'ok':''}">
+        <div class="ub-top"><b>${escapeHtml(j.aptName)}</b><span>${j.state==='done' ? '✓ uploaded' : failed ? 'stopped' : pct + '%'}</span></div>
+        <div class="ub-track"><div class="ub-fill" style="width:${pct}%"></div></div>
+        <div class="ub-msg">${failed ? `⚠ ${escapeHtml(j.error||'Upload failed')} <button type="button" onclick="retryJob('${j.id}')">Retry</button>` : escapeHtml(j.phase || '')}</div>
+      </div>`;
+    }).join('');
+    bar.style.display = 'block';
+    document.body.style.paddingTop = bar.offsetHeight + 'px';
+  });
+}
+function retryJob(id){
+  const job = uploadJobs.find(j => j.id === id);
+  if(job) enqueueJob(job);
+}
+async function resumePendingJobs(){
+  const saved = await idbAll('jobs');
+  for(const j of saved){
+    if(uploadJobs.some(x => x.id === j.id)) continue;
+    uploadJobs.push(j);
+    j.state = 'queued'; j.phase = 'Resuming…';
+  }
+  if(saved.length){ renderUploadBar(); runUploadQueue(); }
+}
+window.addEventListener('beforeunload', e => {
+  if(uploadJobs.some(j => j.state === 'queued' || j.state === 'running')){ e.preventDefault(); e.returnValue = ''; }
+});
+window.addEventListener('pagehide', () => { saveDraftNow(); });
+document.addEventListener('visibilitychange', () => { if(document.visibilityState === 'hidden') saveDraftNow(); });
 
 loadConfig();
 </script>
