@@ -123,7 +123,7 @@
   html,body{overscroll-behavior-y:contain;} /* stops pull-down-to-refresh from wiping a form in progress */
   .insp-toggle button{min-height:46px;line-height:1.15;white-space:normal;padding:8px 3px;font-size:11.5px;}
   .insp-toggle button.sel-unchecked{background:var(--orange);border-color:var(--orange);color:#fff;}
-  .insp-item.missing{border-left:5px solid var(--red);background:#fff6f7;}
+  .insp-item.missing{border-left:6px solid var(--red);background:#ffecee;box-shadow:inset 0 0 0 1.5px #f5b8c0;}
   .insp-item .why{color:var(--red);font-size:12.5px;font-weight:800;margin-top:8px;}
   .insp-item .prev{font-size:12px;color:var(--gray);margin:-2px 0 9px;font-weight:700;line-height:1.35;}
   .insp-section-count.bad{color:var(--red);font-weight:800;}
@@ -139,6 +139,7 @@
   #upload-bar .ub-row.failed .ub-fill{background:var(--red);}
   #upload-bar .ub-msg{font-size:11.5px;opacity:.85;}
   #upload-bar .ub-msg button{margin-left:8px;background:#fff;color:#24220f;border:none;border-radius:6px;padding:3px 10px;font-weight:800;font-size:11.5px;}
+  .export-row .desc .chk{font-size:11.5px;font-weight:800;color:var(--navy);background:#f2ede0;border-radius:6px;padding:5px 8px;margin-bottom:5px;line-height:1.35;}
   .export-row img.zoomable{cursor:zoom-in;}
   .photo-preview img.zoomable{cursor:zoom-in;}
   .photo-viewer{position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,0.92);display:none;flex-direction:column;align-items:center;justify-content:center;}
@@ -393,7 +394,7 @@
 const MONDAY_TOKEN = "eyJhbGciOiJIUzI1NiJ9.eyJ0aWQiOjYzODAzNTMwOSwiYWFpIjoxMSwidWlkIjo2OTQ3MzQxMCwiaWFkIjoiMjAyNi0wMy0yNlQwOTozMDoyNC4wMDBaIiwicGVyIjoibWU6d3JpdGUiLCJhY3RpZCI6MjQyNDkyOTMsInJnbiI6ImV1YzEifQ.lRfb3yhcBlKPl1sz71YP8M39uIwl_103FQwW5-fhE60";
 const MONDAY_FILE_RELAY = 'https://little-poetry-f71b.tomerg1992.workers.dev/';
 const WORKER_INSPECTION_SUBMIT_URL = 'https://little-poetry-f71b.tomerg1992.workers.dev/inspection-submit';
-const APP_VERSION = "2026-11-12.1";
+const APP_VERSION = "2026-11-12.2";
 
 const BOARD_REPAIRS = 5103597278;
 const BOARD_PROJECTS = 1667314838;
@@ -1014,6 +1015,13 @@ async function enterResolveList(building){
   document.getElementById('resolve-loading').style.display = 'none';
   renderResolveList();
 }
+// Tickets created from an inspection start with "Checklist question (section): question";
+// show that as its own labelled line instead of a run-on sentence.
+function descriptionHtml(description){
+  const m = /^Checklist question \(([^)]*)\): ([^\n]*)\n\n([\s\S]*)$/.exec(description || '');
+  if(!m) return escapeHtml(description);
+  return `<div class="chk">📋 ${escapeHtml(m[1])} — ${escapeHtml(m[2])}</div>${escapeHtml(m[3])}`;
+}
 function renderResolveList(){
   const list = document.getElementById('resolve-list');
   document.getElementById('resolve-empty-note').style.display = resolveItems.length===0 ? 'block' : 'none';
@@ -1023,7 +1031,7 @@ function renderResolveList(){
       <div class="body">
         <div class="cat">${escapeHtml(it.location)} — ${escapeHtml(it.category)}</div>
         <div class="meta">${escapeHtml(it.reportedBy)} · ${new Date(it.createdAt).toLocaleDateString()}</div>
-        <div class="desc">${escapeHtml(it.description)}</div>
+        <div class="desc">${descriptionHtml(it.description)}</div>
       </div>
     </div>
   `).join('');
@@ -1039,7 +1047,7 @@ function openResolveForm(itemId){
     <div class="body">
       <div class="cat">${escapeHtml(resolvingItem.location)} — ${escapeHtml(resolvingItem.category)}</div>
       <div class="meta">Reported by ${escapeHtml(resolvingItem.reportedBy)} · ${new Date(resolvingItem.createdAt).toLocaleDateString()}${(resolvingItem.photoUrls||[]).length ? ' · tap photo to enlarge' : ''}</div>
-      <div class="desc">${escapeHtml(resolvingItem.description)}</div>
+      <div class="desc">${descriptionHtml(resolvingItem.description)}</div>
     </div>
   `;
   document.getElementById('resolve-notes').value = '';
@@ -1567,7 +1575,7 @@ function inspectionProblems(){
   const out = [];
   for(const i of inspectionItems){
     if(!isVisibleItem(i)) continue;
-    if(!i.status) out.push({key:i.key, why:'Choose a status'});
+    if(!i.status) out.push({key:i.key, why:''});   // red highlight only — an unanswered item is obvious, no text needed
     else if(i.status === 'repair' && !hasExistingTicket(i)){
       if(!i.category) out.push({key:i.key, why:'Pick a category'});
       else if(!i.description.trim()) out.push({key:i.key, why:'Describe the issue'});
@@ -1597,7 +1605,7 @@ function renderInspectionChecklist(){
     const items = bySection[section];
     const done = items.filter(i => i.status).length;
     const bad = items.some(i => problemMap.has(i.key));
-    const rows = items.map(item => renderInspectionItemRow(item, problemMap.get(item.key))).join('');
+    const rows = items.map(item => renderInspectionItemRow(item, problemMap.has(item.key), problemMap.get(item.key))).join('');
     const addBedroomHtml = (allowBedrooms && section === lastBedroomSection && nextBedroomLabel) ? `
     <div class="add-bedroom-card" id="insp-add-bedroom-card">
       <button type="button" id="insp-add-bedroom-btn" onclick="addInspectionBedroom()">+ Add ${escapeHtml(nextBedroomLabel)}</button>
@@ -1629,7 +1637,7 @@ function renderInspectionChecklist(){
     err.textContent = problemMap.size ? `${problemMap.size} item${problemMap.size===1?'':'s'} still need${problemMap.size===1?'s':''} an answer — highlighted in red.` : '';
   }
 }
-function renderInspectionItemRow(item, problemWhy){
+function renderInspectionItemRow(item, isProblem, problemWhy){
   const k = item.key.replace(/'/g, "\\'");
   const existing = hasExistingTicket(item);
   let repairForm = '';
@@ -1667,7 +1675,7 @@ function renderInspectionItemRow(item, problemWhy){
     ? btn('approved','sel-approved','✓ Fixed') + btn('repair','sel-repair','✗ Still needs repair') + btn('na','sel-na','N/A')
     : btn('approved','sel-approved','✓ Approved') + btn('repair','sel-repair','✗ Need Repair') + btn('na','sel-na','N/A') + btn('unchecked','sel-unchecked','⏸ Not checked');
   return `
-    <div class="insp-item ${problemWhy?'missing':''}" data-key="${escapeHtml(item.key)}">
+    <div class="insp-item ${isProblem?'missing':''}" data-key="${escapeHtml(item.key)}">
       <div class="txt">${escapeHtml(item.text)}</div>
       ${prevLine}
       <div class="insp-toggle">${toggle}</div>
@@ -1812,7 +1820,9 @@ async function jobSubmitRepairItem(job, item, info){
       [REPAIR_COL.location]: job.aptName,
       [REPAIR_COL.apartmentRecord]: {item_ids:[Number(job.aptId)]},
       [REPAIR_COL.category]: {label: item.category},
-      [REPAIR_COL.description]: {text: item.description},
+      // Lead with the checklist question this answers, so the ticket (and the
+      // contractor PDF built from it) makes sense without the checklist at hand.
+      [REPAIR_COL.description]: {text: `Checklist question (${item.section}): ${item.text}\n\n${item.description}`},
       [REPAIR_COL.reportedBy]: job.inspectorName,
       [REPAIR_COL.status]: {label: 'New'}
     };
